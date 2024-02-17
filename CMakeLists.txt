@@ -1,3 +1,35 @@
+if (STANDARD_BUILD)
+cmake_minimum_required(VERSION 3.20)
+project(libnatkit-core LANGUAGES C CXX)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+set(LIBNATKIT_CORE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(LIBNATKIT_CORE_INCLUDE "${LIBNATKIT_CORE_ROOT}/include")
+set(LIBNATKIT_CORE_HEADER_FILES
+  "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.hpp"
+  )
+
+set(LIBNATKIT_CORE_SRC_FILES
+  "${LIBNATKIT_CORE_ROOT}/src/BasicMetaInfoSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/Stream.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/StreamType.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.cpp"
+  )
+
+
+add_subdirectory(third-party/cJSON)
+
+add_library(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES} ${LIBNATKIT_CORE_HEADER_FILES})
+target_include_directories(libnatkit-core PRIVATE ${LIBNATKIT_CORE_INCLUDE})
+target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
+target_link_libraries(libnatkit-core cjson)
+else()
 idf_component_register(
   SRCS 
   "src/BasicMetaInfoSchema.cpp"
@@ -18,3 +50,4 @@ idf_component_register(
   REQUIRES
   json
   )
+endif()
