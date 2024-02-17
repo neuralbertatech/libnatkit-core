@@ -17,7 +17,7 @@ namespace nat::core {
 
 namespace Strings {
 
-std::vector<std::string> split(const std::string& string, char delimiter) {
+inline std::vector<std::string> split(const std::string& string, char delimiter) {
     size_t prevIndex = 0;
     size_t nextIndex = 0;
     std::vector<std::string> strings;
@@ -34,7 +34,7 @@ std::vector<std::string> split(const std::string& string, char delimiter) {
     return strings;
 }
 
-std::string toLowercase(const std::string& string) {
+inline std::string toLowercase(const std::string& string) {
     std::string lowercaseString{string};
     std::transform(lowercaseString.begin(), lowercaseString.end(), lowercaseString.begin(), [](const auto& character) { return std::tolower(character); });
     return lowercaseString;
@@ -45,7 +45,7 @@ std::string toLowercase(const std::string& string) {
 namespace Vectors {
 
 template <typename T>
-std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::vector<T>& vec) {
+inline std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::vector<T>& vec) {
   std::vector<std::unique_ptr<T>> wrappedVec{};
   for (const auto& val : vec) {
 	  wrappedVec.emplace_back(std::make_unique<T>(val));
