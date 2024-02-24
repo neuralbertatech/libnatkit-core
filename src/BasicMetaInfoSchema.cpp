@@ -40,7 +40,7 @@ BasicMetaInfoSchema::encodeToBytes(const SerializationType &type) const {
     return getName() + ": {\"name\": " + streamName + "}";
   }
 
-  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeJson(const std::vector<uint8_t> &message) {
+  std::optional<std::unique_ptr<BasicMetaInfoSchema>> BasicMetaInfoSchema::decodeJson(const std::vector<uint8_t> &message) {
         std::string jsonStr(std::begin(message), std::end(message));
 #ifdef SERVER
         const auto json = nlohmann::json::parse(jsonStr);
