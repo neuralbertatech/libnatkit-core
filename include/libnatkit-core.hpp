@@ -239,7 +239,7 @@ class Decoder {
 
 class Encoder {
   public:
-    virtual ~Encoder();
+    virtual ~Encoder() {}
 
     virtual bool isSerializationTypeSupported(const SerializationType) = 0;
 
