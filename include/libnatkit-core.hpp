@@ -288,6 +288,51 @@ public:
 
 };
 
+class NatImuDataSchema: public Schema, public Decoder {
+  uint64_t time;
+  float data[9];
+
+public:
+  inline static const std::string name = "NatImuDataSchema";
+
+  NatImuDataSchema(uint64_t time, float* data, int size) : time(time) {
+    assert(size <= 9);
+    for (int i = 0; i < 9; ++i)
+      if (i < size)
+        this->data[i] = data[i];
+      else
+        this->data[i] = 0;
+  }
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(const SerializationType type) const override;
+
+  virtual std::string toString() const override;
+
+  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeJson(const std::vector<uint8_t> &message);
+
+  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeAll(const std::vector<uint8_t> &message,
+                                    const SerializationType &type);
+
+  static void
+  decodeAndDispatch(const std::vector<uint8_t> &message,
+                    const SerializationType &type,
+                    const std::function<void(const std::shared_ptr<Schema> &)>
+                        &dispatchMethod);
+
+  virtual std::optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message,
+                                    const SerializationType &type) const override;
+
+  static void registerWithRegistry(Registry &registry);
+
+  virtual std::string getName() const override;
+
+  std::string getStreamName() const;
+
+};
+
 struct BasicTopicInformation {
   const StreamType type;
   const SerializationType serializationType;
