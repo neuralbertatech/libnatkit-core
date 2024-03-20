@@ -295,14 +295,7 @@ class NatImuDataSchema: public Schema, public Decoder {
 public:
   inline static const std::string name = "NatImuDataSchema";
 
-  NatImuDataSchema(uint64_t time, float* data, int size) : time(time) {
-    assert(size <= 9);
-    for (int i = 0; i < 9; ++i)
-      if (i < size)
-        this->data[i] = data[i];
-      else
-        this->data[i] = 0;
-  }
+  NatImuDataSchema(uint64_t time, float* data, int size);
 
   virtual std::unique_ptr<std::vector<uint8_t>>
   encodeToBytes(const SerializationType &type) const override;
@@ -311,9 +304,9 @@ public:
 
   virtual std::string toString() const override;
 
-  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeJson(const std::vector<uint8_t> &message);
+  static std::optional<std::unique_ptr<NatImuDataSchema>> decodeJson(const std::vector<uint8_t> &message);
 
-  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeAll(const std::vector<uint8_t> &message,
+  static std::optional<std::unique_ptr<NatImuDataSchema>> decodeAll(const std::vector<uint8_t> &message,
                                     const SerializationType &type);
 
   static void
@@ -330,6 +323,8 @@ public:
   virtual std::string getName() const override;
 
   std::string getStreamName() const;
+
+  double getTime() const;
 
 };
 
