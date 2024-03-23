@@ -43,10 +43,17 @@ set(LIBNATKIT_CORE_SRC_FILES
 
 add_subdirectory(third-party/cJSON)
 
-add_library(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES} ${LIBNATKIT_CORE_HEADER_FILES})
+add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES} ${LIBNATKIT_CORE_HEADER_FILES})
 target_include_directories(libnatkit-core PRIVATE ${LIBNATKIT_CORE_INCLUDE})
 target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
 target_link_libraries(libnatkit-core cjson)
+
+install(TARGETS libnatkit-core
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
+install(FILES ${LIBNATKIT_CORE_HEADER_FILES} DESTINATION include)
+
 else()
 idf_component_register(
   SRCS 
