@@ -25,7 +25,7 @@ Optional createKafkaBrokerName(const char *brokerName) {
     long long streamId = strtoll(streamIdString, NULL, 10);
 
     Optional streamTypeMaybe = streamTypeFromString(streamTypeName);
-    if (streamTypeMaybe.has_value()) {
+    if (streamTypeMaybe != NULL) {
         return Stream(brokerName, streamTypeMaybe.value(), streamId, streamEncoderName, streamSchemaName);
     } else {
         Optional result;
