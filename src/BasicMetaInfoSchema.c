@@ -7,7 +7,7 @@
 #ifdef SERVER
 #include <nlohmann/json.hpp>
 #else
-#include "cJSON.h"
+#include <cjson/cJSON.h>
 #endif
 
 typedef uint8_t* uint8_ptr;
