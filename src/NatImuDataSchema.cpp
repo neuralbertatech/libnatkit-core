@@ -2,7 +2,8 @@
 
 #include <cJSON.h>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
 NatImuDataSchema::NatImuDataSchema(uint64_t time, float* data, int size) : time(time) {
   assert(size <= 9);
@@ -20,7 +21,7 @@ NatImuDataSchema::encodeToBytes(const SerializationType &type) const {
     cJSON *jsonObject = cJSON_CreateObject();
     cJSON_AddNumberToObject(jsonObject, "time", time);
     const auto jsonStr = std::string(cJSON_Print(jsonObject));
-    return std::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+    return make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
   }
     assert(0);
 }
@@ -38,15 +39,15 @@ std::string NatImuDataSchema::toString() const {
   return getName() + ": {\"time\": " + std::to_string(time) + "}";
 }
 
-std::optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeJson(const std::vector<uint8_t> &message) {
+Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeJson(const std::vector<uint8_t> &message) {
       std::string jsonStr(std::begin(message), std::end(message));
       cJSON *json = cJSON_Parse(jsonStr.c_str());
       cJSON *name = cJSON_GetObjectItemCaseSensitive(json, "time");
       float tmpData[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-      return std::make_unique<NatImuDataSchema>(name->valuedouble, tmpData, 9);
+      return make_unique<NatImuDataSchema>(name->valuedouble, tmpData, 9);
     }
 
-std::optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeAll(const std::vector<uint8_t> &message,
+Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeAll(const std::vector<uint8_t> &message,
                                   const SerializationType &type) {
   switch (type) {
   case SerializationType::Json:
@@ -61,23 +62,39 @@ NatImuDataSchema::decodeAndDispatch(const std::vector<uint8_t> &message,
                   const SerializationType &type,
                   const std::function<void(const std::shared_ptr<Schema> &)>
                       &dispatchMethod) {
-  const std::optional<std::shared_ptr<Schema>> decodedMessageMaybe = decodeAll(message, type);
+  const Optional<std::unique_ptr<NatImuDataSchema>> decodedMessageMaybe = decodeAll(message, type);
   if (decodedMessageMaybe.has_value()) {
-    dispatchMethod(decodedMessageMaybe.value());
+    std::shared_ptr<NatImuDataSchema> sharedDecodedMessage = std::move(decodedMessageMaybe.value());
+    dispatchMethod(sharedDecodedMessage);
   }
 }
 
-std::optional<std::shared_ptr<Schema>> NatImuDataSchema::tryDecode(const std::vector<uint8_t> &message,
+Optional<std::shared_ptr<Schema>> NatImuDataSchema::tryDecode(const std::vector<uint8_t> &message,
                                   const SerializationType &type) const {
-  return decodeAll(message, type);
+  auto decoded = decodeAll(message, type);
+  if (decoded.has_value()) {
+    std::shared_ptr<Schema> sharedDecoded = std::move(decoded.value());
+    return sharedDecoded;
+  } else {
+    return {};
+  }
 }
 
 void NatImuDataSchema::registerWithRegistry(Registry &registry) {
-  registry.registerDecoder(name, SerializationType::Json, decodeAll);
+  registry.registerDecoder(name, SerializationType::Json, [](const std::vector<uint8_t> &message, const SerializationType &type) {
+        Optional<std::unique_ptr<NatImuDataSchema>> decodedMaybe = decodeAll(message, type);
+        if (decodedMaybe.has_value()) {
+          std::unique_ptr<Schema> convertedDecoded = std::move(decodedMaybe.value());
+          return Optional<std::unique_ptr<Schema>>{std::move(convertedDecoded)};
+        } else {
+          return Optional<std::unique_ptr<Schema>>{};
+        }
+      });
 }
 
 std::string NatImuDataSchema::getName() const { return name; }
 
 double NatImuDataSchema::getTime() const { return time; }
 
-} // namespace nat::core
+} // namespace core
+} // namespace nat

@@ -1,7 +1,8 @@
 #include <libnatkit-core.hpp>
 
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
 std::string toString(const StreamType &streamType) {
   switch (streamType) {
@@ -24,14 +25,16 @@ std::string toString(const StreamType &streamType) {
   }
 }
 
-std::optional<StreamType>
+Optional<StreamType>
 streamTypeFromString(const std::string &streamTypeString) {
   const auto lowercaseType = Strings::toLowercase(streamTypeString);
-  if (lowercaseStringToStreamTypeMapping.contains(lowercaseType)) {
-    return lowercaseStringToStreamTypeMapping.at(lowercaseType);
+  const auto searchResult = lowercaseStringToStreamTypeMapping.find(lowercaseType);
+  if (searchResult != lowercaseStringToStreamTypeMapping.end()) {
+    return {searchResult->second};
   } else {
     return {};
   }
 }
 
-}
+} // namespace core
+} // namespace nat
