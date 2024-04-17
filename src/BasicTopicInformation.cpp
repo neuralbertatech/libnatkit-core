@@ -1,12 +1,13 @@
 #include <libnatkit-core.hpp>
 #include <iostream>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
-  std::optional<std::unique_ptr<BasicTopicInformation>>
+  Optional<std::unique_ptr<BasicTopicInformation>>
   BasicTopicInformation::create(const std::string &kafkaTopicString) {
     const auto splitName = Strings::split(kafkaTopicString, '-');
-    if (std::ssize(splitName) != 4) {
+    if (splitName.size() != 4) {
       std::cerr << "Topic String does not contain the four parts\n";
       return {};
     }
@@ -46,4 +47,5 @@ namespace nat::core {
            ::nat::core::toString(serializationType) + "-" + schemaName;
   }
 
-} // namespace nat::core
+} // namespace core
+} // namespace nat

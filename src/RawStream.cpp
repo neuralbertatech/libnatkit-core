@@ -3,11 +3,12 @@
 
 #include <libnatkit-core.hpp>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
 // A RawStream is a Stream that has not been read from yet, so any meta information has
 // not been derived yet
-	std::optional<std::unique_ptr<RawStream>> RawStream::create(const std::vector<BasicTopicInformation>& topics) {
+	Optional<std::unique_ptr<RawStream>> RawStream::create(const std::vector<BasicTopicInformation>& topics) {
 		if (topics.size() == 0) {
 			return {};
 		}
@@ -20,7 +21,7 @@ namespace nat::core {
 		return std::unique_ptr<RawStream>(new RawStream(id, topics));
 	}
 
-	std::optional<std::unique_ptr<RawStream>> RawStream::create(std::vector<std::unique_ptr<BasicTopicInformation>>&& topics) {
+	Optional<std::unique_ptr<RawStream>> RawStream::create(std::vector<std::unique_ptr<BasicTopicInformation>>&& topics) {
 	  if (topics.size() == 0) {
 			return {};
 		}
@@ -36,10 +37,10 @@ namespace nat::core {
 
 	std::string RawStream::toPrettyString() const {
             std::string string = "RawStream: [";
-	    for (int i = 0; i < std::ssize(topics); ++i) {
+	    for (int i = 0; i < topics.size(); ++i) {
 		string.append("\n    ");
 		string.append(topics[i]->toString());
-		if (i+1 < std::ssize(topics)) {
+		if (i+1 < topics.size()) {
 		  string.append(",");
 		} else {
 			string.append("\n]");
@@ -57,7 +58,7 @@ namespace nat::core {
 		if (topic.id != id) {
 			return false;
 		} else {
-			topics.emplace_back(std::make_unique<BasicTopicInformation>(topic));
+			topics.emplace_back(make_unique<BasicTopicInformation>(topic));
 			return true;
 		}
 	}
@@ -66,4 +67,5 @@ namespace nat::core {
 		return id;
 	}
 
-}
+} // namespace core
+} // namespace nat

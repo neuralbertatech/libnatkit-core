@@ -6,11 +6,13 @@
 #include <libnatkit-core.hpp>
 
 
-namespace nat::core {
-  std::optional<Stream>
+namespace nat {
+namespace core {
+
+  Optional<Stream>
   Stream::createFromKafkaBrokerName(const std::string &brokerName) {
     const auto splitName = Strings::split(brokerName, '-');
-    if (std::ssize(splitName) != 4) {
+    if (splitName.size() != 4) {
       return {};
     }
     const auto streamTypeName = splitName[0];
@@ -30,4 +32,5 @@ namespace nat::core {
   }
 
 
-} // namespace nat::core
+} // namespace core
+} // namespace nat

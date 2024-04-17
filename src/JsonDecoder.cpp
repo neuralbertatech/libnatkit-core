@@ -1,6 +1,7 @@
 #include <libnatkit-core.hpp>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
     bool JsonDecoder::isSerializationTypeSupported(const SerializationType type) const {
       switch(type) {
@@ -12,7 +13,7 @@ namespace nat::core {
     }
 
     // TODO: Change this return type
-  std::optional<std::shared_ptr<Schema>> JsonDecoder::tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const {
+  Optional<std::shared_ptr<Schema>> JsonDecoder::tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const {
     switch(type) {
       case SerializationType::Json:
         // TODO: Need a json library
@@ -23,4 +24,5 @@ namespace nat::core {
     }
   }
 
-}
+} // namespace nat
+} // namespace core

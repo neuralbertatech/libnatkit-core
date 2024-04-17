@@ -14,7 +14,37 @@
 #include <vector>
 
 
-namespace nat::core {
+namespace nat {
+namespace core {
+
+inline template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+template <typename T>
+class Optional {
+  T* valMaybe = nullptr;
+
+public:
+  Optional() : valMaybe(nullptr) {}
+  Optional(T* val) : valMaybe(val) {}
+  Optional(T val) : valMaybe(new T{std::move(val)}) {}
+
+  ~Optional() {
+    if (has_value())
+      delete valMaybe;
+  }
+
+  bool has_value() const { return valMaybe != nullptr; }
+  T& value() const { return *valMaybe; }
+  void set(T val) { 
+    if (has_value())
+      delete valMaybe;
+    valMaybe = new T{val};
+  }
+};
 
 namespace Strings {
 
@@ -37,7 +67,7 @@ inline std::vector<std::string> split(const std::string& string, char delimiter)
 
 inline std::string toLowercase(const std::string& string) {
     std::string lowercaseString{string};
-    std::transform(lowercaseString.begin(), lowercaseString.end(), lowercaseString.begin(), [](const auto& character) { return std::tolower(character); });
+    std::transform(lowercaseString.begin(), lowercaseString.end(), lowercaseString.begin(), [](const char character) { return std::tolower(character); });
     return lowercaseString;
 }
 
@@ -49,14 +79,13 @@ template <typename T>
 inline std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::vector<T>& vec) {
   std::vector<std::unique_ptr<T>> wrappedVec{};
   for (const auto& val : vec) {
-	  wrappedVec.emplace_back(std::make_unique<T>(val));
+	  wrappedVec.emplace_back(make_unique<T>(val));
   }
 
   return wrappedVec;
 }
 
 }
-
 
 using message_t = std::vector<uint8_t>;
 
@@ -85,7 +114,7 @@ static const std::unordered_map<std::string, SerializationType>
       std::transform(
           serializationTypeToStringMapping.begin(), serializationTypeToStringMapping.end(),
           std::inserter(newMap, newMap.end()),
-          [](const auto &pair) -> std::pair<std::string, SerializationType> {
+          [](const std::pair<SerializationType, std::string> &pair) -> std::pair<std::string, SerializationType> {
             return {Strings::toLowercase(pair.second), pair.first};
           });
       return newMap;
@@ -94,7 +123,9 @@ static const std::unordered_map<std::string, SerializationType>
 static const std::unordered_map<std::string, SerializationType>
     lowercaseStringToSerializationTypeMapping = []() {
       std::unordered_map<std::string, SerializationType> lowercaseMap{};
-      for (const auto& [key, val] : stringToSerializationTypeMapping) {
+      for (const auto& pair : stringToSerializationTypeMapping) {
+        const auto key = pair.first;
+        const auto val = pair.second;
         lowercaseMap[Strings::toLowercase(key)] = val;
       }
       return lowercaseMap;
@@ -104,7 +135,7 @@ SerializationType getSerializationType(const std::string& encoderName);
 
 std::string toString(const SerializationType& streamType);
 
-std::optional<SerializationType>
+Optional<SerializationType>
 serializationTypeFromString(const std::string &streamTypeString);
 
 
@@ -142,7 +173,7 @@ static const std::unordered_map<std::string, StreamType>
       std::transform(
           streamTypeToStringMapping.begin(), streamTypeToStringMapping.end(),
           std::inserter(newMap, newMap.end()),
-          [](const auto &pair) -> std::pair<std::string, StreamType> {
+          [](const std::pair<StreamType, std::string> &pair) -> std::pair<std::string, StreamType> {
             return {Strings::toLowercase(pair.second), pair.first};
           });
       return newMap;
@@ -151,7 +182,9 @@ static const std::unordered_map<std::string, StreamType>
 static const std::unordered_map<std::string, StreamType>
     lowercaseStringToStreamTypeMapping = []() {
       std::unordered_map<std::string, StreamType> lowercaseMap{};
-      for (const auto& [key, val] : stringToStreamTypeMapping) {
+      for (const auto& pair : stringToStreamTypeMapping) {
+        const auto key = pair.first;
+        const auto val = pair.second;
         lowercaseMap[Strings::toLowercase(key)] = val;
       }
       return lowercaseMap;
@@ -159,7 +192,7 @@ static const std::unordered_map<std::string, StreamType>
 
 std::string toString(const StreamType &streamType);
 
-std::optional<StreamType>
+Optional<StreamType>
 streamTypeFromString(const std::string &streamTypeString);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -179,7 +212,7 @@ public:
         serializationType(nat::core::getSerializationType(encoderName)),
         schemaName(schemaName) {}
 
-  static std::optional<Stream>
+  static Optional<Stream>
   createFromKafkaBrokerName(const std::string &brokerName);
 
   std::string getName() const { return name; }
@@ -227,7 +260,7 @@ class Schema {
     virtual std::string toString() const = 0;
 };
 
-using decoder_t = std::function<std::optional<std::unique_ptr<Schema>>(const std::vector<uint8_t>& message, const SerializationType& type)>;
+using decoder_t = std::function<Optional<std::unique_ptr<Schema>>(const std::vector<uint8_t>& message, const SerializationType& type)>;
 
 class Decoder {
   public:
@@ -235,7 +268,7 @@ class Decoder {
 
     virtual bool isSerializationTypeSupported(const SerializationType) const = 0;
 
-    virtual std::optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const = 0;
+    virtual Optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const = 0;
 };
 
 class Encoder {
@@ -266,9 +299,9 @@ public:
 
   virtual std::string toString() const override;
 
-  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeJson(const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<BasicMetaInfoSchema>> decodeJson(const std::vector<uint8_t> &message);
 
-  static std::optional<std::unique_ptr<BasicMetaInfoSchema>> decodeAll(const std::vector<uint8_t> &message,
+  static Optional<std::unique_ptr<BasicMetaInfoSchema>> decodeAll(const std::vector<uint8_t> &message,
                                     const SerializationType &type);
 
   static void
@@ -277,7 +310,7 @@ public:
                     const std::function<void(const std::shared_ptr<Schema> &)>
                         &dispatchMethod);
 
-  virtual std::optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message,
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message,
                                     const SerializationType &type) const override;
 
   static void registerWithRegistry(Registry &registry);
@@ -285,6 +318,12 @@ public:
   virtual std::string getName() const override;
 
   std::string getStreamName() const;
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(const std::vector<uint8_t> &message,
+                                    const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(const std::vector<uint8_t> &message,
+                                    const SerializationType &type);
 
 };
 
@@ -304,9 +343,9 @@ public:
 
   virtual std::string toString() const override;
 
-  static std::optional<std::unique_ptr<NatImuDataSchema>> decodeJson(const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<NatImuDataSchema>> decodeJson(const std::vector<uint8_t> &message);
 
-  static std::optional<std::unique_ptr<NatImuDataSchema>> decodeAll(const std::vector<uint8_t> &message,
+  static Optional<std::unique_ptr<NatImuDataSchema>> decodeAll(const std::vector<uint8_t> &message,
                                     const SerializationType &type);
 
   static void
@@ -315,7 +354,7 @@ public:
                     const std::function<void(const std::shared_ptr<Schema> &)>
                         &dispatchMethod);
 
-  virtual std::optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message,
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message,
                                     const SerializationType &type) const override;
 
   static void registerWithRegistry(Registry &registry);
@@ -336,9 +375,22 @@ struct BasicTopicInformation {
 
   BasicTopicInformation() = delete;
   BasicTopicInformation(const BasicTopicInformation &other) = default;
-  auto operator<=>(const BasicTopicInformation &) const = default;
+  bool operator<(const BasicTopicInformation& other) const {
+    if (type < other.type) return true;
+    if (type > other.type) return false;
+    if (serializationType < other.serializationType) return true;
+    if (serializationType > other.serializationType) return false;
+    if (id < other.id) return true;
+    if (id > other.id) return false;
+    if (schemaName < other.schemaName) return true;
+    return false;
+  }
 
-  static std::optional<std::unique_ptr<BasicTopicInformation>>
+  bool operator==(const BasicTopicInformation& other) const {
+    return type == other.type && serializationType == other.serializationType && id == other.id && schemaName == other.schemaName;
+  }
+
+  static Optional<std::unique_ptr<BasicTopicInformation>>
   create(const std::string &kafkaTopicString);
 
   std::string toString() const;
@@ -358,7 +410,7 @@ class JsonDecoder : public Decoder {
     virtual bool isSerializationTypeSupported(const SerializationType type) const override;
 
     // TODO: Change this return type
-  virtual std::optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const override;
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t> &message, const SerializationType &type) const override;
 };
 
 class JsonEncoder : public Encoder {
@@ -379,7 +431,7 @@ public:
 
   virtual void enqueueMessageToReceive(const std::shared_ptr<message_t> message) = 0;
 
-  virtual std::optional<std::shared_ptr<message_t>> tryGetNextMessage() = 0;
+  virtual Optional<std::shared_ptr<message_t>> tryGetNextMessage() = 0;
 };
 
 class PlainTextMessage {
@@ -402,9 +454,9 @@ class RawStream {
   public:
 	RawStream() = delete;
 
-	static std::optional<std::unique_ptr<RawStream>> create(const std::vector<BasicTopicInformation>& topics);
+	static Optional<std::unique_ptr<RawStream>> create(const std::vector<BasicTopicInformation>& topics);
 
-	static std::optional<std::unique_ptr<RawStream>> create(std::vector<std::unique_ptr<BasicTopicInformation>>&& topics);
+	static Optional<std::unique_ptr<RawStream>> create(std::vector<std::unique_ptr<BasicTopicInformation>>&& topics);
 
 	std::string toPrettyString() const;
 
@@ -437,7 +489,7 @@ class Registry {
 
     void registerSchemaHandler(const std::string& schemaName, const SerializationType& type, const std::function<void(const std::shared_ptr<Schema>&)>& dispatchFunction);
     
-    std::optional<std::unique_ptr<Schema>> tryDecode(const std::vector<uint8_t>& message, const BasicTopicInformation& topicInfo) const;
+    Optional<std::unique_ptr<Schema>> tryDecode(const std::vector<uint8_t>& message, const BasicTopicInformation& topicInfo) const;
 
     void dispatchOnDecode(const std::vector<uint8_t>& message, const BasicTopicInformation& topicInfo);
 };
@@ -452,10 +504,10 @@ public:
                   const std::shared_ptr<Registry> &registry)
       : topicInfo(topicInfo), registry(registry) {}
 
-  std::optional<std::unique_ptr<Schema>>
+  Optional<std::unique_ptr<Schema>>
   tryDecodeMessage(const message_t &message);
 
-  std::optional<std::unique_ptr<message_t>>
+  Optional<std::unique_ptr<message_t>>
   tryEncodeMessage(const Schema &schema) const;
 };
 
@@ -470,10 +522,11 @@ class TopicMessenger {
   
   void sendMessage(const Schema &schema);
 
-  std::optional<std::unique_ptr<Schema>> tryGetNexMessage();
+  Optional<std::unique_ptr<Schema>> tryGetNexMessage();
 };
 
 
 
 
-} // namespace nat::core
+} // namespace core
+} // namespace nat

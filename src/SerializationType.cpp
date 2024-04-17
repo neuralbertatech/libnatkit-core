@@ -1,7 +1,8 @@
 #include <libnatkit-core.hpp>
 #include <iostream>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
 // TODO: DELETEME
 SerializationType getSerializationType(const std::string& encoderName) {
@@ -23,14 +24,16 @@ std::string toString(const SerializationType& serializationType) {
   }
 }
 
-std::optional<SerializationType>
+Optional<SerializationType>
 serializationTypeFromString(const std::string &serializationTypeString) {
   const auto lowercaseType = Strings::toLowercase(serializationTypeString);
-  if (lowercaseStringToSerializationTypeMapping.contains(lowercaseType)) {
-    return lowercaseStringToSerializationTypeMapping.at(lowercaseType);
+  auto searchResult = lowercaseStringToSerializationTypeMapping.find(lowercaseType);
+  if (searchResult != lowercaseStringToSerializationTypeMapping.end()) {
+    return Optional<SerializationType>{searchResult->second};
   } else {
     return {};
   }
 }
 
-}
+} // namespace core
+} // namespace nat

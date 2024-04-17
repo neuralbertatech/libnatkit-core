@@ -1,6 +1,7 @@
 #include <libnatkit-core.hpp>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
   void TopicMessenger::sendMessage(const Schema &schema) {
     auto encodedMessageMaybe = translator->tryEncodeMessage(schema);
@@ -9,7 +10,7 @@ namespace nat::core {
     }
   }
 
-  std::optional<std::unique_ptr<Schema>> TopicMessenger::tryGetNexMessage() {
+  Optional<std::unique_ptr<Schema>> TopicMessenger::tryGetNexMessage() {
     const auto message = messagingQueue->tryGetNextMessage();
     if (message.has_value()) {
       return translator->tryDecodeMessage(*message.value());
@@ -18,4 +19,5 @@ namespace nat::core {
     }
   }
 
-}
+} // namespace core
+} // namespace nat
