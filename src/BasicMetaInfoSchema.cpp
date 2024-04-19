@@ -9,6 +9,8 @@
 namespace nat {
 namespace core {
 
+const std::string BasicMetaInfoSchema::name = "BasicMetaInfoSchema";
+
 static Optional<std::shared_ptr<Schema>> convertUniqueBasicMetaInfoSchema(Optional<std::unique_ptr<BasicMetaInfoSchema>>&& unique) {
     if (unique.has_value()) {
       std::shared_ptr<Schema> shared = std::move(unique.value());
@@ -26,12 +28,12 @@ BasicMetaInfoSchema::encodeToBytes(const SerializationType &type) const {
       nlohmann::json j;
       j["name"] = streamName;
       const auto jsonStr = j.dump();
-      return make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+      return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
 #else
       cJSON *jsonObject = cJSON_CreateObject();
       cJSON_AddStringToObject(jsonObject, "name", streamName.c_str());
       const auto jsonStr = std::string(cJSON_Print(jsonObject));
-      return make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+      return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
 #endif
     }
       assert(0);
@@ -54,11 +56,11 @@ BasicMetaInfoSchema::encodeToBytes(const SerializationType &type) const {
         std::string jsonStr(std::begin(message), std::end(message));
 #ifdef SERVER
         const auto json = nlohmann::json::parse(jsonStr);
-        return make_unique<BasicMetaInfoSchema>(json["name"]);
+        return nat::core::make_unique<BasicMetaInfoSchema>(json["name"]);
 #else
         cJSON *json = cJSON_Parse(jsonStr.c_str());
         cJSON *name = cJSON_GetObjectItemCaseSensitive(json, "name");
-        return std::move(make_unique<BasicMetaInfoSchema>(std::string(name->valuestring)));
+        return std::move(nat::core::make_unique<BasicMetaInfoSchema>(std::string(name->valuestring)));
 #endif
       }
 

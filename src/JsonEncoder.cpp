@@ -1,6 +1,7 @@
 #include <libnatkit-core.hpp>
 
-namespace nat::core {
+namespace nat {
+namespace core {
 
     bool JsonEncoder::isSerializationTypeSupported(const SerializationType type) {
       switch(type) {
@@ -15,4 +16,5 @@ namespace nat::core {
       return {};
     }
 
-}
+} // namespace core
+} // namespace nat
