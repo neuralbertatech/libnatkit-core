@@ -79,7 +79,7 @@ template <typename T>
 inline std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::vector<T>& vec) {
   std::vector<std::unique_ptr<T>> wrappedVec{};
   for (const auto& val : vec) {
-	  wrappedVec.emplace_back(make_unique<T>(val));
+	  wrappedVec.emplace_back(nat::core::make_unique<T>(val));
   }
 
   return wrappedVec;
@@ -288,7 +288,7 @@ class Registry;
 class BasicMetaInfoSchema : public Schema, public Decoder {
   std::string streamName;
 public:
-  inline static const std::string name = "BasicMetaInfoSchema";
+  static const std::string name;
 
   BasicMetaInfoSchema(const std::string &streamName) : streamName(streamName) {}
 
@@ -332,7 +332,7 @@ class NatImuDataSchema: public Schema, public Decoder {
   float data[9];
 
 public:
-  inline static const std::string name = "NatImuDataSchema";
+  static const std::string name;
 
   NatImuDataSchema(uint64_t time, float* data, int size);
 

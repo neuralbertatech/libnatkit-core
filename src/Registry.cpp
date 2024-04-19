@@ -16,7 +16,7 @@ namespace core {
     }
 
 std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
-  auto registry = make_unique<Registry>();
+  auto registry = nat::core::make_unique<Registry>();
   BasicMetaInfoSchema::registerWithRegistry(*registry);
 
   return registry;
@@ -38,7 +38,8 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
 
     void Registry::registerSchemaHandler(const std::string& schemaName, const SerializationType& type, const std::function<void(const std::shared_ptr<Schema>&)>& dispatchFunction) {
       const auto key = createKey(schemaName, type);
-      if (const auto results = schemaHandlers.find(key); results != schemaHandlers.end()) {
+      const auto results = schemaHandlers.find(key);
+      if (results != schemaHandlers.end()) {
         results->second.push_back(dispatchFunction);
       } else {
         schemaHandlers.emplace(std::make_pair(key, std::vector<std::function<void(const std::shared_ptr<Schema>&)>>{dispatchFunction}));

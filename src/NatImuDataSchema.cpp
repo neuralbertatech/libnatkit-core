@@ -5,6 +5,8 @@
 namespace nat {
 namespace core {
 
+const std::string NatImuDataSchema::name = "NatImuDataSchema";
+
 NatImuDataSchema::NatImuDataSchema(uint64_t time, float* data, int size) : time(time) {
   assert(size <= 9);
   for (int i = 0; i < 9; ++i)
@@ -21,7 +23,7 @@ NatImuDataSchema::encodeToBytes(const SerializationType &type) const {
     cJSON *jsonObject = cJSON_CreateObject();
     cJSON_AddNumberToObject(jsonObject, "time", time);
     const auto jsonStr = std::string(cJSON_Print(jsonObject));
-    return make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+    return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
   }
     assert(0);
 }
@@ -44,7 +46,7 @@ Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeJson(const s
       cJSON *json = cJSON_Parse(jsonStr.c_str());
       cJSON *name = cJSON_GetObjectItemCaseSensitive(json, "time");
       float tmpData[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-      return make_unique<NatImuDataSchema>(name->valuedouble, tmpData, 9);
+      return nat::core::make_unique<NatImuDataSchema>(name->valuedouble, tmpData, 9);
     }
 
 Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeAll(const std::vector<uint8_t> &message,

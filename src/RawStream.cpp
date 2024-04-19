@@ -58,7 +58,7 @@ namespace core {
 		if (topic.id != id) {
 			return false;
 		} else {
-			topics.emplace_back(make_unique<BasicTopicInformation>(topic));
+			topics.emplace_back(nat::core::make_unique<BasicTopicInformation>(topic));
 			return true;
 		}
 	}
