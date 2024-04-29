@@ -37,7 +37,7 @@ char* toLowerCase(const char* string) {
     size_t length = lenstr(string);
     char* lowerCaseString = malloc(length + 1);
 
-    for (size_t i = 0, i < length, i++) {
+    for (size_t i = 0; i < length; i++) {
         lowerCaseString[i] = tolower(string[i]);
     }
 
@@ -230,7 +230,7 @@ void freeStringToStreamTypeMapping(char** keys, StreamType* values, size_t size)
     free(values);
 }
 
-char* toString(const StreamType* streamType);
+char *toString(const StreamType *streamType);
 
 typedef struct {
     int hasValue;
@@ -241,24 +241,23 @@ OptionalStreamType streamTypeFromString(const char *streamTypeString);
 
 //6. STREAM //
 
-struct Stream {
+typedef struct {
     const char* name;
     StreamType type;
     uint64_t id;
     const char* encoderName;
     SerializationType serializationType;
     const char* schemaName;
-};
+} Stream;
 
-void Stream_init(struct Stream *stream, const char *name, StreamType type, uint64_t id, const char *encoderName, SerializationType serializationType, const char *schemaName) {
+void Stream_init(Stream *stream, const char *name, StreamType type, uint64_t id, const char *encoderName, SerializationType serializationType, const char *schemaName) {
     Stream stream;
-    stream.name = *name;
-    stream.type = type;
-    stream.id = id;
-    stream.encoderName = *encoderName;
-    getSerializationTypeFromString(encoderName);
-    stream.schemaName = *schemaName;
-    return stream;
+    stream->name = name;
+    stream->type = type;
+    stream->id = id;
+    stream->encoderName = *encoderName;
+    stream->serializationType = getSerializationTypeFromString(encoderName);
+    stream->schemaName = schemaName;
 }
 
 
@@ -273,8 +272,10 @@ typedef struct {
     char *data;
 } String;
 
-String Stream_getName(const Stream *stream) {
-    return stream -> name;
+String Stream_getName(Stream stream) {
+    String name;
+    name.data = stream.name;
+    return name;
 }
 
 StreamType Stream_getType(const Stream *stream) {
@@ -285,7 +286,7 @@ uint64_t Stream_getId(const Stream *stream) {
     return stream -> id;
 }
 
-String Stream_getEncoderName(const Stream *stream) {
+const char* Stream_getEncoderName(const Stream *stream) {
     return stream -> encoderName;
 }
 
@@ -293,14 +294,15 @@ SerializationType Stream_getSerializationType(const Stream *stream) {
     return stream -> serializationType;
 }
 
-String Stream_getSchemaName(const Stream *stream) {
+const char* Stream_getSchemaName(const Stream *stream) {
     return stream -> schemaName;
 }
 
 String toTopicString(const Stream *stream) {
     String result;
-    result.data = malloc(strlen(stream->encoderName.data) + 50);
-    sprintf(result.data, "%d-%llu-%s-%s", stream->type, stream->id, stream.encoderName.data, stream-> schemaName.data);
+    int bufferSize = strlen(stream->encoderName) + strlen(stream->schemaName) + 50;
+    result.data = malloc(bufferSize);
+    sprintf(result.data, "%d-%llu-%s-%s", stream->type, stream->id, stream->encoderName, stream->schemaName);
     return result;
 }
 
@@ -334,7 +336,7 @@ SerializationType StreamMessage_getSerializationType(const StreamMessage *msg) {
     return getSerializationType(&msg-> stream);
 }
 
-String StreamMessage_getSchemaName(const StreamMessage *msg) {
+StreamMessage_getSchemaName(const StreamMessage *msg) {
     return getSchemaName(&msg -> stream);
 }
 
@@ -344,13 +346,15 @@ typedef struct {
 char content[256];
 } message_t;
 
-typedef struct {
+typedef struct Schema Schema;
+
+typedef struct Schema{
     bool (*isSerializationTypeSupported)(const SerializationType);
     message_t* (*encodeToBytes)(const SerializationType*);
     const char* (*Stream_getSchemaName)();
     const char* (*toString)();
-    const char* (*getName)(struct Schema* self);
-} Schema;
+    const char* (*getName)(Schema* self); 
+};
 
 Schema* createSchema() {
     Schema* schema = malloc(sizeof(Schema));
@@ -417,6 +421,8 @@ Schema* decodeJson(const uint8_t* message, size_t message_t, const Serialization
 }
 
 // 9. BASIC META //
+bool isSerializationTypeSupported(SerializationType type);
+uint8_t* encodeToBytes(const BasicMetaInfoSchema *schema);
 
 BasicMetaInfoSchema* createBasicMetaInfoSchema(const char* streamName) {
     BasicMetaInfoSchema* schema = malloc(sizeof(BasicMetaInfoSchema));
@@ -464,9 +470,9 @@ const char* getStreamName(Schema* self) {
 // 10. BASIC TOPIC //
 
 typedef struct {
-    const StreamType type;
-    const SerializationType serializationType;
-    const uint64_t id;
+    StreamType type;
+    SerializationType serializationType;
+    uint64_t id;
     const char *schemaName;
 } BasicTopicInformation;
 
@@ -561,7 +567,7 @@ void freePlainTextMessage(PlainTextMessage *message) {
 }
 
 typedef struct {
-    const uint64_t id;
+    uint64_t id;
     BasicTopicInformation** topics;
     size_t num_topics;
 } RawStream;
@@ -606,12 +612,12 @@ char* RawStream_toPrettyString(const RawStream* stream);
 char* RawStream_toString(const RawStream* stream);
 
 typedef struct {
-    Registry* createDefaultInitalizeRegistry();
-    void registerEncoder(Registry* registry, const char* schemaName, const char* type, const Encoder* encoder);
-    void registerDecoder(Registry* registry, const char* schemaName, const char* type, decoder_t decoder);
-    void registerSchemaHandler(Registry* registry, const char* schemaName, const char* type, void (*dispatchFunction)(const Schema*));
-    Schema* tryDecode(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
-    void dispatchOnDecode(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
+    Registry* (*createDefaultInitalizeRegistry)();
+    void (*registerEncoder)(Registry* registry, const char* schemaName, const char* type, const Encoder* encoder);
+    void (*registerDecoder)(Registry* registry, const char* schemaName, const char* type, decoder_t decoder);
+    void (*registerSchemaHandler)(Registry* registry, const char* schemaName, const char* type, void (*dispatchFunction)(const Schema*));
+    Schema* (*tryDecode)(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
+    void (*dispatchOnDecode)(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
 } Registry;
 
 // 13. TRANSLATE //
@@ -630,14 +636,16 @@ typedef struct {
 } Optional;
 
 typedef struct {
-    const sharedPtr topicInfo;
-    const sharedPtr registry;
+    sharedPtr topicInfo;
+    sharedPtr registry;
 } TopicTranslator;
 
 TopicTranslator* TopicTranslator_create(const sharedPtr *topicInfo, const sharedPtr *registry) {
-    TopicTranslator *translator = (TopicTranslator)malloc(sizeof(TopicTranslator));
-    translator -> topicInfo = *topicInfo;
-    translator -> registry = *registry;
+    TopicTranslator *translator = (TopicTranslator*)malloc(sizeof(TopicTranslator));
+    if (translator != NULL) {
+        translator -> topicInfo = *topicInfo;
+        translator -> registry = *registry;    
+    }
     return translator;
 }
 
