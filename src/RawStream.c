@@ -5,7 +5,7 @@
 
 RawStream* RawStream_create(const BasicTopicInformation* topics, size_t topics_count) {
     if (topics_count == 0) {
-        return NULL
+        return NULL;
     }
     uint64_t id = topics[0].id;
 
@@ -15,20 +15,20 @@ RawStream* RawStream_create(const BasicTopicInformation* topics, size_t topics_c
         }
     }
 
-    RawStream* stream = (struct RawStream*)malloc(sizeof(struct RawStream));
+    RawStream* stream = (struct RawStream*)malloc(sizeof(RawStream));
     if (stream == NULL) {
         return NULL;
     }
 
     stream -> id = id;
-    stream -> topics_count = topics_count;
+    stream -> num_topics = topics_count;
     stream -> topics = (BasicTopicInformation**)malloc(topics_count * sizeof(BasicTopicInformation*));
     if (stream->topics == NULL) {
         free(stream);
         return NULL;
     }
     for (size_t i = 0; i < topics_count; ++i) {
-        stream->topics[i] = (struct BasicTopicInformation*)malloc(sizeof(struct BasicTopicInformation));
+        stream->topics[i] = (struct BasicTopicInformation*)malloc(sizeof(BasicTopicInformation));
         if (stream->topics[i] == NULL) {
             for (size_t j = 0; j < i; ++j) {
                 free(stream->topics[j]);
@@ -37,7 +37,7 @@ RawStream* RawStream_create(const BasicTopicInformation* topics, size_t topics_c
             free(stream);
             return NULL;
         }
-        memcpy(stream->topics[i], &topics[i], sizeof(struct BasicTopicInformation));
+        memcpy(stream->topics[i], &topics[i], sizeof(BasicTopicInformation));
     }
 
     return stream;
@@ -45,15 +45,13 @@ RawStream* RawStream_create(const BasicTopicInformation* topics, size_t topics_c
 
 void RawStream_destroy(RawStream* stream) {
     if (stream != NULL) {
-        for (size_t i = 0; i < stream -> topics_count; ++i) {
+        for (size_t i = 0; i < stream -> num_topics; ++i) {
             free(stream -> topics[i]);
         }
-        free(stream -> topics[i]);
-        free(stream);
     }
 }
 
-char* RawStream_toPrettyString(const struct RawStream* stream) {
+char* RawStream_toPrettyString(const RawStream* stream) {
     if (stream == NULL) {
         return NULL;
     }
@@ -67,9 +65,9 @@ char* RawStream_toPrettyString(const struct RawStream* stream) {
     size_t offset = 0;
     offset += snprintf(result + offset, max_string_length - offset, "RawStream: [");
 
-    for (size_t i = 0; i < stream->topics_count; ++i) {
+    for (size_t i = 0; i < stream->num_topics; ++i) {
         offset += snprintf(result + offset, max_string_length - offset, "\n    %s", "<topic_string_representation>");
-        if (i + 1 < stream->topics_count) {
+        if (i + 1 < stream->num_topics) {
             offset += snprintf(result + offset, max_string_length - offset, ",");
         } else {
             offset += snprintf(result + offset, max_string_length - offset, "\n]");
