@@ -171,6 +171,23 @@ SerializationType getSerializationTypeFromString(const char* str) {
     return -1; 
 }
 
+typedef struct {
+    const char* key;
+    SerializationType value;
+} KeyValuePair;
+
+void createLowercaseMapping(KeyValuePair* mapping, size_t numPairs, KeyValuePair* lowercaseMapping) {
+    for (size_t i = 0; i < numPairs; ++i) {
+        char lowercaseKey[256];
+        strcpy(lowercaseKey, mapping[i].key);
+        toLowercase(lowercaseKey);
+        lowercaseMapping[i].key = strdup(lowercaseKey);
+        lowercaseMapping[i].value = mapping[i].value;
+    }
+}
+
+KeyValuePair lowercaseStringToSerializationTypeMapping[10];
+
 void freeSerialization() {
     for (size_t i = 0; i < stringToSerializationTypeMappingSize; i++) {
         free((void*)stringToSerializationTypeMapping[i].string);
@@ -197,7 +214,7 @@ typedef enum {
 
 typedef struct {
     StreamType type;
-    const char* string;
+    const char *string;
 
 } StreamTypeStringPair;
 
@@ -211,7 +228,7 @@ static const StreamTypeStringPair streamTypeToStringMapping[] = {
     {LOGGING_HEARTBEAT, "Heartbeat"},
 };
 
-void initializeStringToStreamTypeMapping(const StreamTypeStringPair* mapping, size_t size, char** keys, StreamType* values) {
+StreamType* initializeStringToStreamTypeMapping(const StreamTypeStringPair* mapping, size_t size, char** keys, StreamType* values) {
 
     for (size_t i = 0; i < size; i++) {
         char* lowerCaseString = strdup(mapping[i].string);
@@ -230,6 +247,15 @@ void freeStringToStreamTypeMapping(char** keys, StreamType* values, size_t size)
     free(values);
 }
 
+void initLowercaseStringtoStreamTypeMapping() {
+    static StreamTypeStringPair lowercaseStringtoStreamTypeMapping[sizeof(streamTypeToStringMapping) / sizeof(streamTypeToStringMapping[0])] = {0};
+
+    for (int i = 0; i < sizeof(streamTypeToStringMapping) / sizeof(streamTypeToStringMapping[0]); i++) {
+        strcpy(lowercaseStringtoStreamTypeMapping[i].string, streamTypeToStringMapping[i].string);
+        lowercaseStringtoStreamTypeMapping[i].type = streamTypeToStringMapping[i].type;
+    }
+}
+
 char *toString(const StreamType *streamType);
 
 typedef struct {
@@ -237,7 +263,7 @@ typedef struct {
     StreamType value;
 } OptionalStreamType;
 
-OptionalStreamType streamTypeFromString(const char *streamTypeString);
+int streamTypeFromString(const char *streamTypeString);
 
 //6. STREAM //
 
@@ -259,7 +285,6 @@ void Stream_init(Stream *stream, const char *name, StreamType type, uint64_t id,
     stream->serializationType = getSerializationTypeFromString(encoderName);
     stream->schemaName = schemaName;
 }
-
 
 Stream createKafkaBrokerName(const String *brokerName) {
     Stream stream;
@@ -453,7 +478,7 @@ typedef struct {
 typedef void (*DispatchMethod)(Schema*);
 void decodeAndDispatch(const uint8_t* message, size_t message_size, const SerializationType* type, DispatchMethod dispatchMethod);
 
-Schema* tryDecode(const uint8_t* message, size_t message_size, const SerializationType* type);
+Schema* tryDecode(const uint8_t* message, const SerializationType* type);
 
 void registerWithRegistry(Registry* registry, Schema* schema) {
     printf("%s\n", schema -> getName(schema));
@@ -539,9 +564,9 @@ typedef struct {
     message_t* (*tryGetNextMessage)(struct MessagingQueue *queue);
 } MessagingQueue;
 
-void MessagingQueue_enqueueMessageToSend(struct MessagingQueue *queue, message_t *message);
+void MessagingQueue_enqueueMessageToSend(struct MessagingQueue *queue);
 void MessagingQueue_enqueueMessageToReceive(struct MessagingQueue *queue, const message_t *message);
-message_t* MessagingQueue_tryGetNextMessage(struct MessagingQueue *queue);
+message_t* MessagingQueue_tryGetNextMessage();
 
 typedef struct {
     const char *plainTextMessage;
@@ -616,7 +641,7 @@ typedef struct {
     void (*registerEncoder)(Registry* registry, const char* schemaName, const char* type, const Encoder* encoder);
     void (*registerDecoder)(Registry* registry, const char* schemaName, const char* type, decoder_t decoder);
     void (*registerSchemaHandler)(Registry* registry, const char* schemaName, const char* type, void (*dispatchFunction)(const Schema*));
-    Schema* (*tryDecode)(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
+    Schema* (*tryDecode)(const Registry* registry, const BasicTopicInformation* topicInfo);
     void (*dispatchOnDecode)(const Registry* registry, const unsigned char* message, size_t message_length, const BasicTopicInformation* topicInfo);
 } Registry;
 
@@ -653,14 +678,14 @@ void freeTopicTranslator(TopicTranslator *translator) {
     free(translator);
 }
 
-Optional TopicTranslator_tryDecodeMessage(const TopicTranslator *translator, const message_t *message) {
+Optional TopicTranslator_tryDecodeMessage(const message_t *message) {
     Optional result;
     result.has_value = 0;
     result.value = NULL;
     return result;
 } 
 
-Optional TopicTranslator_tryEncodeMessage(const TopicTranslator *translator, const Schema *schema) {
+Optional TopicTranslator_tryEncodeMessage(const TopicTranslator *translator) {
     Optional result;
     result.has_value = 0;
     result.value = NULL;
@@ -683,7 +708,7 @@ void freeTopicMessenger(TopicMessenger *messenger) {
     free(messenger);
 }
 
-void TopicMessenger_sendMessage(const TopicMessenger *messenger, const Schema *schema);
+void TopicMessenger_sendMessage(const TopicMessenger *messenger);
 
 Optional TopicMessenger_tryGetNextMessage(const TopicMessenger *messenger) {
     Optional result;
