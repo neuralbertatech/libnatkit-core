@@ -2,7 +2,7 @@
 
 void TopicMessenger_sendMessage(const Schema *schema) {
     auto encodedMessageMaybe = TopicTranslator_tryEncodeMessage(schema);
-    if(encodeMessageMaybe) {
+    if(encodedMessageMaybe) {
         MessagingQueue_enqueueMessageToSend(encodedMessageMaybe);
     }
 }
@@ -10,7 +10,7 @@ void TopicMessenger_sendMessage(const Schema *schema) {
 void *TopicMessenger_tryGetNextMessage() {
     const void *message = MessagingQueue_tryGetNextMessage();
     if(message) {
-        return TopicTranslator_tryDecodeMessage(message);
+        TopicTranslator_tryDecodeMessage(message);
     } else {
         return NULL;
     }
