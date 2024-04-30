@@ -1,11 +1,11 @@
 #include <libnatkit-core.h>
 
-void *TopicTranslator_tryDecodeMessage(const message_t *message) {
-    return Registry_TryDecode(message, *topicInfo);
+Schema* tryDecodeMessage(const message_t *message, const Registry *registry, const *topicInfo) {
+    Schema *decodedSchema = registry-> tryDecode(message, *topicInfo);
 }
 
-void *TopicTranslator_tryEncodeMessage(const Schema *schema) {
-    if(isSerializationTypeSupported(schema, topicInfo -> SerializationType)) {
+message_t* tryEncodeMessage(const Schema *schema, BasicTopicInformation *topicInfo) {
+    if(isSerializationTypeSupported(schema, topicInfo -> serializationType)) {
         return encodeToBytes(schema, topicInfo -> serializationType);
     } else {
         return NULL;
