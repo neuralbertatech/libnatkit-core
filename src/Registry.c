@@ -1,63 +1,71 @@
 #include <libnatkit-core.h>
 #include <stdio.h>
 
-Registry createKey(const char *schemaName, const SerializationType *type) {
-    Registry buffer[256];
+const char* createKey(const char* schemaName, const SerializationType* type) {
+    char buffer[256];
     char* serializedType = toStringSerializationType(type);
     sprintf(buffer, "%s-%s", schemaName, serializedType);
-    return buffer;
+    
+    Registry* key = (Registry*)malloc(strlen(buffer) + 1);
+    if (key != NULL) {
+        strcpy(key, buffer);
+    }
+    return key;
 }
 
-Registry createKeyStreamMessage(const StreamMessage *message) {
-    return createKey(message.getSchemaName(), message.getSerializationType());
+const char* createKeyStreamMessage(const StreamMessage *message) {
+    return *createKey(getSchemaName(), getSerializationType());
 }
 
-Registry createKeyBasicTopicInfo(const BasicTopicInformation *topicInfo) {
-    return createKey(topicInfo.schemaName, topicInfo.serializationType);
+const char* createKeyBasicTopicInfo(const BasicTopicInformation *topicInfo) {
+    return *createKey(topicInfo->schemaName, topicInfo->serializationType);
 }
 
-Registry createDefaultInitialRegistry() {
-    Registry registry = (Registry *)malloc(sizeof(struct Registry));
-    BasicMetaInfoSchema resgisterWithRegistry(*registry);
+Registry* createDefaultInitialRegistry() {
+    Registry* registry = (Registry*)malloc(sizeof(Registry));
+    if (registry != NULL) {
+        resgisterWithRegistry(*registry);
+    }
+       
     return registry;
 }
 
-void registerEncoder(const char *schemaName, SerializationType *type, Encoder *encoder) {
+void registerEncoder(Registry *registry, const char *schemaName, SerializationType *type, Encoder *encoder) {
     char *key = createKey(schemaName, type);
     if (key != NULL) {
-        insertEncoder(resgistry, key, encoder);
+        insertEncoder(registry, key, encoder);
     } else {
         updateEncoder(registry, key, encoder);
     }
     free(key);
 }
 
-void registerDecoder(const char *schemaName, SerializationType *type, decoder_t *decoder) {
+void registerDecoder(Registry *registry, const char *schemaName, SerializationType *type, decoder_t *decoder) {
     char *key = createKey(schemaName, type);
     if (key != NULL) {
-        insertDecoder(resgistry, key, decoder);
+        insertDecoder(registry, key, decoder);
     } else {
         updateDecoder(registry, key, decoder);
     }
     free(key);
 }
 
+typedef void (*DispatchFunction);
 
-typdef void (*DispatchFunction)(const struct Schema *);
 //////////////////////////////////////////////////////////////////////////
-void pushBack(Vector *vec, DispatchFunction dispatchFunction) {
+void pushBack(vector_uint8_t *vec, DispatchFunction dispatchFunction) {
     if (vec->size >= vec->capacity) {
         size_t new_capacity = (vec->capacity == 0) ? 1 : 2 * vec -> capacity;
         DispatchFunction *new_data = (DispatchFunction*)realloc(vec->data, new_capacity * sizeof(DispatchFunction));
         
         vec -> data = new_data;
-        vec-> capactiy = new_capacity;
+        vec-> capacity = new_capacity;
     }
     vec->data[vec->size++] = dispatchFunction;
 }
 
 struct Vector* createVectorRegistry() {
-    struct Vector *vec = (struct Vector*)malloc(sizeof(struct Vector));
+    vector_uint8_t* vec = (struct Vector*)malloc(sizeof(Vector));
     if (vec != NULL) {
         vec->data = NULL;
         vec->size = 0;
@@ -66,14 +74,17 @@ struct Vector* createVectorRegistry() {
     return vec;
 }
 
-struct SchemaHandlers {
+typedef struct{
     struct Vector **data; 
     size_t size; 
     size_t capacity;
-};
+    SchemaHandler* handlers;
+} SchemaHandlers;
+
+SchemaHandlers *schemaHandlers;
 
 struct SchemaHandlers* createSchemaHandlers() {
-    struct SchemaHandlers *handlers = (struct SchemaHandlers*)malloc(sizeof(struct SchemaHandlers));
+    SchemaHandlers *handlers = (struct SchemaHandlers*)malloc(sizeof(SchemaHandlers));
     if (handlers != NULL) {
         handlers->data = NULL;
         handlers->size = 0;
@@ -82,7 +93,7 @@ struct SchemaHandlers* createSchemaHandlers() {
     return handlers;
 }
 
-void addHandler(struct SchemaHandlers *handlers, const char *key, DispatchFunction dispatchFunction) {
+void addHandler(SchemaHandlers *handlers, const char *key, DispatchFunction dispatchFunction) {
     if (handlers->size >= handlers->capacity) {
         size_t new_capacity = (handlers->capacity == 0) ? 1 : 2 * handlers->capacity;
         struct Vector **new_data = (struct Vector**)realloc(handlers->data, new_capacity * sizeof(struct Vector*));
@@ -92,45 +103,56 @@ void addHandler(struct SchemaHandlers *handlers, const char *key, DispatchFuncti
         handlers->data = new_data;
         handlers->capacity = new_capacity;
     }
-    struct Vector *vector = createVectorRegistry();
+    Vector *vector = createVectorRegistry();
     if (vector != NULL) {
         pushBack(vector, dispatchFunction);
         handlers->data[handlers->size++] = vector;
     }
 }
+
+typedef struct {
+    DispatchFunction **data;
+    size_t size;
+    size_t capacity;
+} FunctionVector;
+
+FunctionVector* findElement(const char* key) {
+    for (size_t i = 0; i < schemaHandlers -> size; i++) {
+        if (strcmp(schemaHandlers->data[i], key) == 0) {
+            return &schemaHandlers->data[i];
+        }
+    }
+    return NULL;
+}
+
+typedef void (*SchemaHandler)(const Schema*);
+
+
 //////////////////////////////////////////////////////////////////////////////////
-Registry registerSchemaHandler(char *schemaName, const SerializationType *type, DispatchFunction dispatchFunction) {
-    const auto key = createKey(schemaName, type);
-    const auto results = schemaHandlers.find(key);
-    Vector *results_second = createVectorRegistry();
-    if (results != schemaHandlers.end()) {
-        results -> push_back(results_second, dispatchFunction);
+
+void registerSchemaHandler(const char* schemaName, const SerializationType* type, DispatchFunction dispatchFunction) {
+    const char* key = createKey(schemaName, type);
+    Vector* results = findElement(key);
+    if (results != NULL) {
+        pushBack(results, dispatchFunction);
     } else {
         addHandler(schemaHandlers, key, dispatchFunction);
     }
 }
 
-Registry tryDecode(Vector *message, BasicTopicInformation *topicInfo) {
-    const auto key = createKey(topicInfo);
-    const auto results = decoders.find(key);
-    if (results != decoders.end()) {
-        return results -> pushBack(message, topicInfo.serilizationType);
-    } else {
-        return 0;
-    }
-}
 
-Registry dispatchOnDecode(Vector *message, BasicTopicInformation *topicInfo) {
-    Schema schemaMaybe = tryDecode(message, topicInfo);
-    if (schemaMaybe != NULL) {
-        return 0;
+void dispatchOnDecode(const uint8_t* message, size_t messageSize, const BasicTopicInformation* topicInfo) {
+    const Schema* schemaMaybe = tryDecode(message, topicInfo->serializationType);
+
+    if (schemaMaybe == NULL) {
+        return;
     }
-    const auto key = createKey(topicInfo);
-    const auto results = SchemaHandlers.find(key);
-    Vector *handlers;
-    if (results != SchemaHandlers.end()) {
-        for (size_t i = 0; i < handlers -> size; ++i) {
-            handler(shemaMaybe.value());
-        }
+
+    const char* key = createKey(topicInfo->schemaName, topicInfo->serializationType);
+    SchemaHandlers* result = findElement(key);
+
+    for (int i = 0; i < result -> size; i++) {
+        SchemaHandler handler = result->handlers[i];
+        handler(schemaMaybe);
     }
 }
