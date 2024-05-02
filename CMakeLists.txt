@@ -6,13 +6,13 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(MSVC)
   message("------------------ Compiler is MSVC ------------------")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D__msvc_cplusplus /std:c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D__msvc_cplusplus /std:c++20")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /std:c20")
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
   set(BUILD_SHARED_LIBS ON)
 else()
   message("------------------ Compiler is Something Else ------------------")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -std=c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -std=c++20")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0")
   if (NOT APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--disable-new-dtags")
@@ -22,22 +22,36 @@ endif()
 set(LIBNATKIT_CORE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LIBNATKIT_CORE_INCLUDE "${LIBNATKIT_CORE_ROOT}/include")
 set(LIBNATKIT_CORE_HEADER_FILES
-  "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.hpp"
+  "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.h"
   )
 
 set(LIBNATKIT_CORE_SRC_FILES
-  "${LIBNATKIT_CORE_ROOT}/src/BasicMetaInfoSchema.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/Stream.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/StreamType.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.cpp"
-  "${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/BasicMetaInfoSchema.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/Stream.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/StreamType.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.cpp"
+  #"${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.cpp"
+
+  "${LIBNATKIT_CORE_ROOT}/src/BasicMetaInfoSchema.c"
+  "${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.c"
+  "${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.c"
+  "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.c"
+  #"${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.c"
+  "${LIBNATKIT_CORE_ROOT}/src/RawStream.c"
+  "${LIBNATKIT_CORE_ROOT}/src/Registry.c"
+  "${LIBNATKIT_CORE_ROOT}/src/SerializationType.c"
+  "${LIBNATKIT_CORE_ROOT}/src/Stream.c"
+  "${LIBNATKIT_CORE_ROOT}/src/StreamType.c"
+  "${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.c"
+  "${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.c"
+
   )
 
 
@@ -56,7 +70,7 @@ install(FILES ${LIBNATKIT_CORE_HEADER_FILES} DESTINATION include)
 
 else()
 idf_component_register(
-  SRCS 
+  SRCS
   "src/BasicMetaInfoSchema.cpp"
   "src/BasicTopicInformation.cpp"
   "src/JsonDecoder.cpp"
