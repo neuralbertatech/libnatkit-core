@@ -334,7 +334,7 @@ class NatImuDataSchema: public Schema, public Decoder {
 public:
   static const std::string name;
 
-  NatImuDataSchema(uint64_t time, float* data, int size);
+  NatImuDataSchema(uint64_t time, const float* data, int size);
 
   virtual std::unique_ptr<std::vector<uint8_t>>
   encodeToBytes(const SerializationType &type) const override;

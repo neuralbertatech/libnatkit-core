@@ -7,7 +7,7 @@ namespace core {
 
 const std::string NatImuDataSchema::name = "NatImuDataSchema";
 
-NatImuDataSchema::NatImuDataSchema(uint64_t time, float* data, int size) : time(time) {
+NatImuDataSchema::NatImuDataSchema(uint64_t time, const float* data, int size) : time(time) {
   assert(size <= 9);
   for (int i = 0; i < 9; ++i)
     if (i < size)
