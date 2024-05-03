@@ -1,6 +1,7 @@
 #include <libnatkit-core.hpp>
 
 #include <cJSON.h>
+#include <string.h>
 
 namespace nat {
 namespace core {
@@ -16,14 +17,71 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, const float* data, int size) :
       this->data[i] = 0;
 }
 
+cJSON* CreateJsonDataArray(const float *data) {
+  cJSON *jsonDataArray = cJSON_CreateArray();
+  if (jsonDataArray == NULL)
+    goto fail;
+  for (int i = 0; i < 9; ++i) {
+    cJSON *dataNumber = cJSON_CreateNumber(data[i]);
+    if (dataNumber == NULL)
+      goto fail;
+    cJSON_AddItemToArray(jsonDataArray, dataNumber);
+  }
+  return jsonDataArray;
+
+fail:
+  cJSON_Delete(jsonDataArray);
+  return NULL;
+}
+
+std::vector<uint8_t>* stringToBytes(const char *string) {
+  std::vector<uint8_t> *bytes(new std::vector<uint8_t>());
+  int length = strlen(string);
+  bytes->reserve(length);
+  for (int i = 0; i < length; ++i)
+    bytes->emplace_back(string[i]);
+  return bytes;
+}
+
+std::unique_ptr<std::vector<uint8_t>> CreateJsonDataObject(uint64_t time, const float* data) {
+  char *json = NULL;
+  std::vector<uint8_t>* bytes = nullptr;
+  cJSON *jsonObject = cJSON_CreateObject();
+  cJSON *jsonDataArray = NULL;
+  cJSON *jsonTime = NULL;
+    if (jsonObject == NULL)
+      goto cleanup;
+    
+    jsonTime = cJSON_CreateNumber(time);
+    if (jsonTime == NULL)
+      goto cleanup;
+    cJSON_AddNumberToObject(jsonObject, "time", time);
+
+    jsonDataArray = CreateJsonDataArray(data);
+    if (jsonDataArray == NULL)
+      goto cleanup;
+
+    cJSON_AddItemToObject(jsonObject, "data", jsonDataArray);
+
+    json = cJSON_Print(jsonObject);
+    if (json == NULL)
+      goto cleanup;
+    
+    bytes = stringToBytes(json);
+
+cleanup:
+    cJSON_Delete(jsonTime);
+    cJSON_Delete(jsonObject);
+    free(json);
+    return std::unique_ptr<std::vector<uint8_t>>(bytes);
+}
+
 std::unique_ptr<std::vector<uint8_t>>
 NatImuDataSchema::encodeToBytes(const SerializationType &type) const {
   switch (type) {
   case SerializationType::Json:
-    cJSON *jsonObject = cJSON_CreateObject();
-    cJSON_AddNumberToObject(jsonObject, "time", time);
-    const auto jsonStr = std::string(cJSON_Print(jsonObject));
-    return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+    return CreateJsonDataObject(this->time, this->data);
+
   }
     assert(0);
 }
