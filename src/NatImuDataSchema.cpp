@@ -20,18 +20,16 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, const float* data, int size) :
 cJSON* CreateJsonDataArray(const float *data) {
   cJSON *jsonDataArray = cJSON_CreateArray();
   if (jsonDataArray == NULL)
-    goto fail;
+    return NULL;
   for (int i = 0; i < 9; ++i) {
     cJSON *dataNumber = cJSON_CreateNumber(data[i]);
-    if (dataNumber == NULL)
-      goto fail;
+    if (dataNumber == NULL) {
+      cJSON_Delete(jsonDataArray);
+      return NULL;
+    }
     cJSON_AddItemToArray(jsonDataArray, dataNumber);
   }
   return jsonDataArray;
-
-fail:
-  cJSON_Delete(jsonDataArray);
-  return NULL;
 }
 
 std::vector<uint8_t>* stringToBytes(const char *string) {
@@ -45,36 +43,41 @@ std::vector<uint8_t>* stringToBytes(const char *string) {
 
 std::unique_ptr<std::vector<uint8_t>> CreateJsonDataObject(uint64_t time, const float* data) {
   char *json = NULL;
-  std::vector<uint8_t>* bytes = nullptr;
   cJSON *jsonObject = cJSON_CreateObject();
   cJSON *jsonDataArray = NULL;
   cJSON *jsonTime = NULL;
     if (jsonObject == NULL)
-      goto cleanup;
+      return nullptr;
     
     jsonTime = cJSON_CreateNumber(time);
-    if (jsonTime == NULL)
-      goto cleanup;
+    if (jsonTime == NULL) {
+      cJSON_Delete(jsonObject);
+      return nullptr;
+    }
     cJSON_AddNumberToObject(jsonObject, "time", time);
 
     jsonDataArray = CreateJsonDataArray(data);
-    if (jsonDataArray == NULL)
-      goto cleanup;
+    if (jsonDataArray == NULL) {
+      cJSON_Delete(jsonTime);
+      cJSON_Delete(jsonObject);
+      return nullptr;
+    }
 
     cJSON_AddItemToObject(jsonObject, "data", jsonDataArray);
 
     json = cJSON_Print(jsonObject);
-    if (json == NULL)
-      goto cleanup;
-    
-    bytes = stringToBytes(json);
-
-cleanup:
     cJSON_Delete(jsonTime);
     cJSON_Delete(jsonObject);
+    if (json == NULL) {
+      free(json);
+      return nullptr;
+    }
+
+    std::unique_ptr<std::vector<uint8_t>> bytes(stringToBytes(json));
     free(json);
-    return std::unique_ptr<std::vector<uint8_t>>(bytes);
+    return bytes;
 }
+
 
 std::unique_ptr<std::vector<uint8_t>>
 NatImuDataSchema::encodeToBytes(const SerializationType &type) const {
