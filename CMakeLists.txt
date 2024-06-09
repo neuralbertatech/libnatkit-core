@@ -4,6 +4,8 @@ project(libnatkit-core LANGUAGES C CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
+include(GNUInstallDirs)
+
 if(MSVC)
   message("------------------ Compiler is MSVC ------------------")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D__msvc_cplusplus /std:c++11")
@@ -43,16 +45,41 @@ set(LIBNATKIT_CORE_SRC_FILES
 
 add_subdirectory(third-party/cJSON)
 
-add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES} ${LIBNATKIT_CORE_HEADER_FILES})
-target_include_directories(libnatkit-core PRIVATE ${LIBNATKIT_CORE_INCLUDE})
+add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
+set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER ${LIBNATKIT_CORE_HEADER_FILES})
+target_include_directories(libnatkit-core
+    PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_INCLUDE}>
+)
 target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
 target_link_libraries(libnatkit-core cjson)
 
 install(TARGETS libnatkit-core
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-install(FILES ${LIBNATKIT_CORE_HEADER_FILES} DESTINATION include)
+        CONFIGURATIONS Debug
+        RUNTIME
+          DESTINATION ${CMAKE_INSTALL_BINDIR}/Debug
+        LIBRARY
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}/Debug
+        ARCHIVE
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}/Debug
+        INCLUDES
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Debug
+        PUBLIC_HEADER
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Debug
+)
+
+install(TARGETS libnatkit-core
+        CONFIGURATIONS Release RelWithDebInfo MinSizeRel
+        RUNTIME
+          DESTINATION ${CMAKE_INSTALL_BINDIR}/Release
+        LIBRARY
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}/Release
+        ARCHIVE
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}/Release
+        INCLUDES
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Release
+        PUBLIC_HEADER
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Release
+)
 
 else()
 idf_component_register(
