@@ -1,6 +1,10 @@
 #include <libnatkit-core.hpp>
 
+#ifdef SERVER
+#include <nlohmann/json.hpp>
+#else
 #include <cJSON.h>
+#endif
 #include <string.h>
 
 namespace nat {
@@ -17,6 +21,7 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, const float* data, int size) :
       this->data[i] = 0;
 }
 
+#ifndef SERVER
 cJSON* CreateJsonDataArray(const float *data) {
   cJSON *jsonDataArray = cJSON_CreateArray();
   if (jsonDataArray == NULL)
@@ -40,9 +45,20 @@ std::vector<uint8_t>* stringToBytes(const char *string) {
     bytes->emplace_back(string[i]);
   return bytes;
 }
+#endif
 
 std::unique_ptr<std::vector<uint8_t>> CreateJsonDataObject(uint64_t time, const float* data) {
-  char *json = NULL;
+#ifdef SERVER
+    nlohmann::json j;
+    j["time"] = time;
+    nlohmann::json jsonDataArray = nlohmann::json::array();
+    for (int i = 0; i < 9; ++i)
+        jsonDataArray.push_back(data[i]);
+    j["data"] = jsonDataArray;
+    const auto jsonStr = j.dump();
+    return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
+#else
+    char *json = NULL;
   cJSON *jsonObject = cJSON_CreateObject();
   cJSON *jsonDataArray = NULL;
   cJSON *jsonTime = NULL;
@@ -76,6 +92,7 @@ std::unique_ptr<std::vector<uint8_t>> CreateJsonDataObject(uint64_t time, const 
     std::unique_ptr<std::vector<uint8_t>> bytes(stringToBytes(json));
     free(json);
     return bytes;
+#endif
 }
 
 
@@ -104,10 +121,15 @@ std::string NatImuDataSchema::toString() const {
 
 Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeJson(const std::vector<uint8_t> &message) {
       std::string jsonStr(std::begin(message), std::end(message));
+#ifdef SERVER
+      const auto json = nlohmann::json::parse(jsonStr);
+      return nat::core::make_unique<NatImuDataSchema>(json.at("time").get<double>(), json.at("data").get<std::vector<float>>().data(), 9);
+#else
       cJSON *json = cJSON_Parse(jsonStr.c_str());
       cJSON *name = cJSON_GetObjectItemCaseSensitive(json, "time");
       float tmpData[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
       return nat::core::make_unique<NatImuDataSchema>(name->valuedouble, tmpData, 9);
+#endif
     }
 
 Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeAll(const std::vector<uint8_t> &message,
