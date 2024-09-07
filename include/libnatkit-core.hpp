@@ -89,6 +89,10 @@ inline std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::v
 
 using message_t = std::vector<uint8_t>;
 
+inline std::string toString(const message_t& msg) {
+    return std::string(msg.begin(), msg.end());
+}
+
 class StreamInfo {
   std::string streamName;
 
@@ -100,7 +104,8 @@ class StreamInfo {
 
 // Enums ///////////////////////////////////////////////////////////////////////
 enum class SerializationType {
-  Json
+  Json,
+  Csv
 };
 
 static const std::unordered_map<SerializationType, std::string>
@@ -328,13 +333,29 @@ private:
 };
 
 class NatImuDataSchema: public Schema, public Decoder {
+public:
+    enum class SensorAccuracy {
+        Unreliable = 0,
+        LowAccuracy = 1,
+        MediumAccuracy = 2,
+        HighAccuracy = 3
+    };
+
+private:
   uint64_t time;
-  float data[9];
+  float data[13];
+  SensorAccuracy accuracy;
 
 public:
   static const std::string name;
 
-  NatImuDataSchema(uint64_t time, const float* data, int size);
+  NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size);
+
+  static SensorAccuracy convertIntToSensorAccuracy(int val);
+
+  static int convertSensorAccuracyToInt(SensorAccuracy accuracy);
+
+  static std::string toString(SensorAccuracy accuracy);
 
   virtual std::unique_ptr<std::vector<uint8_t>>
   encodeToBytes(const SerializationType &type) const override;
@@ -344,6 +365,8 @@ public:
   virtual std::string toString() const override;
 
   static Optional<std::unique_ptr<NatImuDataSchema>> decodeJson(const std::vector<uint8_t> &message);
+
+  static Optional<std::unique_ptr<NatImuDataSchema>> decodeCsv(const std::vector<uint8_t> &message);
 
   static Optional<std::unique_ptr<NatImuDataSchema>> decodeAll(const std::vector<uint8_t> &message,
                                     const SerializationType &type);
