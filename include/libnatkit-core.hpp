@@ -111,6 +111,7 @@ enum class SerializationType {
 static const std::unordered_map<SerializationType, std::string>
     serializationTypeToStringMapping = {
         {SerializationType::Json, "Json"},
+        {SerializationType::Csv, "CSV"},
 };
 
 static const std::unordered_map<std::string, SerializationType>
@@ -486,6 +487,8 @@ class RawStream {
 	std::string toString() const;
 
 	bool addTopic(const BasicTopicInformation& topic);
+
+    std::vector<std::unique_ptr<BasicTopicInformation>> getTopicsByType(StreamType type);
 
 	uint64_t getId() const;
 };

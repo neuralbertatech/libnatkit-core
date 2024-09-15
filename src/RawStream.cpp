@@ -63,6 +63,14 @@ namespace core {
 		}
 	}
 
+	std::vector<std::unique_ptr<BasicTopicInformation>> RawStream::getTopicsByType(StreamType type) {
+		std::vector<std::unique_ptr<BasicTopicInformation>> filteredTopics{};
+		for (const auto& topic : topics)
+			if (topic->type == type)
+				filteredTopics.emplace_back(nat::core::make_unique<BasicTopicInformation>(*topic));
+		return filteredTopics;
+	}
+
 	uint64_t RawStream::getId() const {
 		return id;
 	}
