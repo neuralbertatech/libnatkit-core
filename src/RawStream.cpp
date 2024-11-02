@@ -63,7 +63,7 @@ namespace core {
 		}
 	}
 
-	std::vector<std::unique_ptr<BasicTopicInformation>> RawStream::getTopicsByType(StreamType type) {
+	std::vector<std::unique_ptr<BasicTopicInformation>> RawStream::getTopicsByType(StreamType type) const {
 		std::vector<std::unique_ptr<BasicTopicInformation>> filteredTopics{};
 		for (const auto& topic : topics)
 			if (topic->type == type)

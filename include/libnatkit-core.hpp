@@ -488,7 +488,7 @@ class RawStream {
 
 	bool addTopic(const BasicTopicInformation& topic);
 
-    std::vector<std::unique_ptr<BasicTopicInformation>> getTopicsByType(StreamType type);
+    std::vector<std::unique_ptr<BasicTopicInformation>> getTopicsByType(StreamType type) const;
 
 	uint64_t getId() const;
 };
