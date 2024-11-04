@@ -14,7 +14,7 @@ if(MSVC)
   set(BUILD_SHARED_LIBS ON)
 else()
   message("------------------ Compiler is Something Else ------------------")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -std=c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -std=c++11 -DSERVER")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0")
   if (NOT APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--disable-new-dtags")
@@ -22,6 +22,7 @@ else()
 endif()
 
 set(LIBNATKIT_CORE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(LIBNATKIT_CORE_THIRD_PARTY_DIR "${LIBNATKIT_CORE_ROOT}/third-party")
 set(LIBNATKIT_CORE_INCLUDE "${LIBNATKIT_CORE_ROOT}/include")
 set(LIBNATKIT_CORE_HEADER_FILES
   "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.hpp"
@@ -43,15 +44,20 @@ set(LIBNATKIT_CORE_SRC_FILES
   )
 
 
-add_subdirectory(third-party/cJSON)
-
 add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
 set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER ${LIBNATKIT_CORE_HEADER_FILES})
 target_include_directories(libnatkit-core
     PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_INCLUDE}>
 )
-target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
-target_link_libraries(libnatkit-core cjson)
+#target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
+#target_link_libraries(libnatkit-core cjson)
+
+add_library(nlohmann INTERFACE)
+target_include_directories(nlohmann INTERFACE ${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include)
+target_link_libraries(libnatkit-core PUBLIC nlohmann)
+#target_include_directories(libnatkit-core
+#  PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include>
+#)
 
 install(TARGETS libnatkit-core
         CONFIGURATIONS Debug
