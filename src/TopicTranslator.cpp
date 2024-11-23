@@ -18,5 +18,21 @@ namespace core {
     }
   }
 
+  StreamType TopicTranslator::getStreamType() const {
+      return topicInfo->type;
+  }
+
+  SerializationType TopicTranslator::getSerializationType() const {
+      return topicInfo->serializationType;
+  }
+
+  uint64_t TopicTranslator::getId() const {
+      return topicInfo->id;
+  }
+
+  std::string TopicTranslator::getSchemaName() const {
+      return topicInfo->schemaName;
+  }
+
 } // namespace core
 } // namespace nat

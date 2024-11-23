@@ -352,6 +352,8 @@ public:
 
   NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size);
 
+  static std::optional<std::shared_ptr<NatImuDataSchema>> tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe);
+
   static SensorAccuracy convertIntToSensorAccuracy(int val);
 
   static int convertSensorAccuracyToInt(SensorAccuracy accuracy);
@@ -385,9 +387,9 @@ public:
 
   virtual std::string getName() const override;
 
-  std::string getStreamName() const;
-
   double getTime() const;
+
+  SensorAccuracy getAccuracy() const;
 
 };
 
@@ -456,6 +458,8 @@ public:
   virtual void enqueueMessageToReceive(const std::shared_ptr<message_t> message) = 0;
 
   virtual Optional<std::shared_ptr<message_t>> tryGetNextMessage() = 0;
+
+  virtual void clearAllMessages() = 0;
 };
 
 class PlainTextMessage {
@@ -535,6 +539,14 @@ public:
 
   Optional<std::unique_ptr<message_t>>
   tryEncodeMessage(const Schema &schema) const;
+
+  StreamType getStreamType() const;
+
+  SerializationType getSerializationType() const;
+
+  uint64_t getId() const;
+
+  std::string getSchemaName() const;
 };
 
 
@@ -548,7 +560,17 @@ class TopicMessenger {
   
   void sendMessage(const Schema &schema);
 
+  StreamType getStreamType() const;
+
+  SerializationType getSerializationType() const;
+
+  uint64_t getId() const;
+
+  std::string getSchemaName() const;
+
   Optional<std::unique_ptr<Schema>> tryGetNexMessage();
+
+  void clearAllMessages();
 };
 
 

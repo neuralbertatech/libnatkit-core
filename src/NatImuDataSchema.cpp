@@ -24,6 +24,20 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccura
       this->data[i] = 0;
 }
 
+std::optional<std::shared_ptr<NatImuDataSchema>> NatImuDataSchema::tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe) {
+    if (!messageMaybe.has_value() || *messageMaybe == nullptr) {
+        return {};
+    }
+    else {
+        if (messageMaybe.value()->getName() == NatImuDataSchema::name) {
+            return std::dynamic_pointer_cast<NatImuDataSchema>(messageMaybe.value());
+        }
+        else {
+            return {};
+        }
+    }
+}
+
 NatImuDataSchema::SensorAccuracy NatImuDataSchema::convertIntToSensorAccuracy(int val) {
     switch (val) {
     case 0:
@@ -314,6 +328,10 @@ void NatImuDataSchema::registerWithRegistry(Registry &registry) {
 std::string NatImuDataSchema::getName() const { return name; }
 
 double NatImuDataSchema::getTime() const { return time; }
+
+NatImuDataSchema::SensorAccuracy NatImuDataSchema::getAccuracy() const {
+    return accuracy;
+}
 
 } // namespace core
 } // namespace nat
