@@ -333,6 +333,8 @@ private:
 
 };
 
+class NatImuBulkDataSchema;
+
 class NatImuDataSchema: public Schema, public Decoder {
 public:
     enum class SensorAccuracy {
@@ -349,6 +351,10 @@ private:
 
 public:
   static const std::string name;
+
+  NatImuDataSchema();
+
+  NatImuDataSchema(const NatImuDataSchema& other);
 
   NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size);
 
@@ -390,6 +396,57 @@ public:
   double getTime() const;
 
   SensorAccuracy getAccuracy() const;
+
+private:
+    friend class NatImuBulkDataSchema;
+
+};
+
+class NatImuBulkDataSchema : public Schema, public Decoder {
+    NatImuDataSchema data[100];
+    uint8_t size;
+
+public:
+    static const std::string name;
+
+    NatImuBulkDataSchema();
+
+    NatImuBulkDataSchema(const NatImuDataSchema* data, uint8_t size);
+
+    bool isFull() const;
+
+    void add(const NatImuDataSchema& datum);
+
+    static std::optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe);
+
+    virtual std::unique_ptr<std::vector<uint8_t>>
+        encodeToBytes(const SerializationType& type) const override;
+
+    virtual bool isSerializationTypeSupported(const SerializationType type) const override;
+
+    virtual std::string toString() const override;
+
+    //static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeJson(const std::vector<uint8_t>& message);
+
+    static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeCsv(const std::vector<uint8_t>& message);
+
+    static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeAll(const std::vector<uint8_t>& message,
+        const SerializationType& type);
+
+    static void
+        decodeAndDispatch(const std::vector<uint8_t>& message,
+            const SerializationType& type,
+            const std::function<void(const std::shared_ptr<Schema>&)>
+            & dispatchMethod);
+
+    virtual Optional<std::shared_ptr<Schema>> tryDecode(const std::vector<uint8_t>& message,
+        const SerializationType& type) const override;
+
+    static void registerWithRegistry(Registry& registry);
+
+    virtual std::string getName() const override;
+
+    std::unique_ptr<std::vector<NatImuDataSchema>> createImuRecords() const;
 
 };
 

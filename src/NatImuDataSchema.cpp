@@ -14,10 +14,22 @@ namespace core {
 const std::string NatImuDataSchema::name = "NatImuDataSchema";
 static const int NatImuDataSchemaDataArraySize = 13;
 
+NatImuDataSchema::NatImuDataSchema()
+    : time(0), accuracy(SensorAccuracy::Unreliable) {
+    for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
+        this->data[i] = 0;
+}
+
+NatImuDataSchema::NatImuDataSchema(const NatImuDataSchema &other)
+    : time(other.time), accuracy(other.accuracy) {
+    for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
+        this->data[i] = other.data[i];
+}
+
 NatImuDataSchema::NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size) 
     : time(time), accuracy(accuracy) {
   assert(size <= NatImuDataSchemaDataArraySize);
-  for (int i = 0; i < 9; ++i)
+  for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
       if (i < size)
           this->data[i] = data[i];
     else

@@ -34,6 +34,7 @@ set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatImuBulkDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
