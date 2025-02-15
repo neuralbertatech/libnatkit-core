@@ -36,6 +36,12 @@ namespace nat {
             data[size++] = datum;
         }
 
+        void NatImuBulkDataSchema::setData(const NatImuDataSchema* data, int32_t size) {
+            assert(size <= NatImuBulkDataSchemaDataArraySize);
+            for (int i = 0; i < size; ++i)
+                this->data[i] = data[i];
+        }
+
 #ifdef SERVER
 
         Optional<std::shared_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe) {

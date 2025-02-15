@@ -419,6 +419,8 @@ public:
 
     void add(const NatImuDataSchema& datum);
 
+    void setData(const NatImuDataSchema* data, int32_t size);
+
 #ifdef SERVER
     static Optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);
 #endif
