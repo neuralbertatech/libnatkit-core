@@ -36,8 +36,10 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccura
       this->data[i] = 0;
 }
 
-std::optional<std::shared_ptr<NatImuDataSchema>> NatImuDataSchema::tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe) {
-    if (!messageMaybe.has_value() || *messageMaybe == nullptr) {
+#ifdef SERVER
+
+Optional<std::shared_ptr<NatImuDataSchema>> NatImuDataSchema::tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe) {
+    if (!messageMaybe.has_value() || messageMaybe.value() == nullptr) {
         return {};
     }
     else {
@@ -49,6 +51,8 @@ std::optional<std::shared_ptr<NatImuDataSchema>> NatImuDataSchema::tryCreateFrom
         }
     }
 }
+
+#endif
 
 NatImuDataSchema::SensorAccuracy NatImuDataSchema::convertIntToSensorAccuracy(int val) {
     switch (val) {

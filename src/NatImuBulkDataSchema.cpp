@@ -36,8 +36,10 @@ namespace nat {
             data[size++] = datum;
         }
 
-        std::optional<std::shared_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe) {
-            if (!messageMaybe.has_value() || *messageMaybe == nullptr) {
+#ifdef SERVER
+
+        Optional<std::shared_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe) {
+            if (!messageMaybe.has_value() || messageMaybe.value() == nullptr) {
                 return {};
             }
             else {
@@ -49,6 +51,8 @@ namespace nat {
                 }
             }
         }
+
+#endif
 
 //#ifndef SERVER
 //        cJSON* CreateJsonDataArray(const float* data) {

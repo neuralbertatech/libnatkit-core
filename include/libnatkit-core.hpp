@@ -358,7 +358,9 @@ public:
 
   NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size);
 
-  static std::optional<std::shared_ptr<NatImuDataSchema>> tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe);
+#ifdef SERVER
+  static Optional<std::shared_ptr<NatImuDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);
+#endif
 
   static SensorAccuracy convertIntToSensorAccuracy(int val);
 
@@ -417,7 +419,9 @@ public:
 
     void add(const NatImuDataSchema& datum);
 
-    static std::optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const std::optional<const std::shared_ptr<Schema>>& messageMaybe);
+#ifdef SERVER
+    static Optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);
+#endif
 
     virtual std::unique_ptr<std::vector<uint8_t>>
         encodeToBytes(const SerializationType& type) const override;
