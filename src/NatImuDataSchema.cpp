@@ -32,8 +32,8 @@ NatImuDataSchema::NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccura
   for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
       if (i < size)
           this->data[i] = data[i];
-    else
-      this->data[i] = 0;
+      else
+        this->data[i] = 0;
 }
 
 #ifdef SERVER

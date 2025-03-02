@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <type_traits>
 
 
 namespace nat {
@@ -87,6 +88,32 @@ inline std::vector<std::unique_ptr<T>> wrapContainedValueWithUnique(const std::v
 
 }
 
+namespace Binary {
+
+template <typename T>
+inline size_t unsafeWriteAsBinaryToArray(char* array, T value) {
+  //assert(is_trivially_copyable<T>::value);
+  uint8_t mask = -1;
+  for (size_t i = 0; i < sizeof(T); ++i) {
+    *(array + i) = (uint8_t)(value & (T)mask);
+    value >>= 8;
+  }
+  return sizeof(T);
+}
+
+template <typename T>
+inline size_t unsafeParseFromBinary(char* array, T& value) {
+  //assert(is_trivially_copyable<T>::value);
+  value &= 0;
+  for (size_t i = sizeof(T); i > 0; ++i) {
+    value |= *(array + i - 1);
+    value <<= 8;
+  }
+  return sizeof(T);
+}
+
+} // namespace Binary
+
 using message_t = std::vector<uint8_t>;
 
 inline std::string toString(const message_t& msg) {
@@ -105,13 +132,15 @@ class StreamInfo {
 // Enums ///////////////////////////////////////////////////////////////////////
 enum class SerializationType {
   Json,
-  Csv
+  Csv,
+  Binary
 };
 
 static const std::unordered_map<SerializationType, std::string>
     serializationTypeToStringMapping = {
         {SerializationType::Json, "Json"},
         {SerializationType::Csv, "CSV"},
+        {SerializationType::Binary, "Binary"},
 };
 
 static const std::unordered_map<std::string, SerializationType>
@@ -435,6 +464,8 @@ public:
     //static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeJson(const std::vector<uint8_t>& message);
 
     static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeCsv(const std::vector<uint8_t>& message);
+
+    static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeBinary(const std::vector<uint8_t>& message);
 
     static Optional<std::unique_ptr<NatImuBulkDataSchema>> decodeAll(const std::vector<uint8_t>& message,
         const SerializationType& type);
