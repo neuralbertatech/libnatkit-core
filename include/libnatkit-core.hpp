@@ -26,42 +26,24 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 template <typename T>
 class Optional {
-  std::unique_ptr<T> valMaybe = nullptr;
+  T* valMaybe = nullptr;
 
 public:
   Optional() : valMaybe(nullptr) {}
+  Optional(T* val) : valMaybe(val) {}
   Optional(T val) : valMaybe(new T{std::move(val)}) {}
-  Optional(const Optional<T>& other) {
-    if (other.has_value()) {
-      valMaybe = make_unique<T>(*other.valMaybe);
-    } else {
-      valMaybe = nullptr;
-    }
+
+  ~Optional() {
+    if (has_value())
+      delete valMaybe;
   }
-  Optional(Optional<T>&& other) = default;
-
-  ~Optional() = default;
-
-  Optional<T>& operator=(const Optional<T>& other) {
-    if (this != &other) {
-      valMaybe.reset();
-      if (other.has_value()) {
-        valMaybe = make_unique<T>(*other.valMaybe);
-      } else {
-        valMaybe = nullptr;
-      }
-    }
-    return *this;
-  }
-
-  Optional<T>& operator=(Optional<T>&& other) = default;
 
   bool has_value() const { return valMaybe != nullptr; }
   T& value() const { return *valMaybe; }
   void set(T val) { 
     if (has_value())
-      valMaybe.reset();
-    valMaybe = make_unique<T>(std::move(val));
+      delete valMaybe;
+    valMaybe = new T{val};
   }
 };
 
@@ -393,17 +375,31 @@ public:
 
 private:
   uint64_t time;
-  float data[13];
-  SensorAccuracy accuracy;
+  float data[10];
+  uint8_t accuracies; // 0bXX XX XX XX
+                      //   ^   ^  ^  ^
+                      //   |   |  |  L rotation_accuracy
+                      //   |   |  L gryoscope_accuracy
+                      //   |   L acceleration_accuracy
+                      //   L unused
+  uint8_t has_data;   // 0bXXXXX X X X
+                      //       ^ ^ ^ ^
+                      //       | | | L rotation_has_data
+                      //       | | L gyroscope_has_data
+                      //       | L acceleration_has_data
+                      //       L unused
 
 public:
   static const std::string name;
+  static const uint32_t NatImuDataSchemaDataArraySize;
 
   NatImuDataSchema();
 
   NatImuDataSchema(const NatImuDataSchema& other);
 
-  NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy accuracy, const float* data, int size);
+  NatImuDataSchema(uint64_t time, NatImuDataSchema::SensorAccuracy acceleration_accuracy, NatImuDataSchema::SensorAccuracy gyroscope_accuracy, NatImuDataSchema::SensorAccuracy rotation_accuracy, bool acceleration_has_data, bool gryoscope_has_data, bool rotation_has_data, const float* data, int size);
+
+  NatImuDataSchema(uint64_t time, uint8_t accuracies, uint8_t has_data, const float* data, int size);
 
 #ifdef SERVER
   static Optional<std::shared_ptr<NatImuDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);
@@ -444,7 +440,17 @@ public:
 
   double getTime() const;
 
-  SensorAccuracy getAccuracy() const;
+  SensorAccuracy getAccelerationAccuracy() const;
+
+  SensorAccuracy getGyroscopeAccuracy() const;
+
+  SensorAccuracy getRotationAccuracy() const;
+
+  bool wasDataSetForAcceleration() const;
+
+  bool wasDataSetForGryoscope() const;
+
+  bool wasDataSetForRotation() const;
 
 private:
     friend class NatImuBulkDataSchema;
