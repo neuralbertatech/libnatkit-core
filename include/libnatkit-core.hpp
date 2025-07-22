@@ -26,24 +26,42 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 template <typename T>
 class Optional {
-  T* valMaybe = nullptr;
+  std::unique_ptr<T> valMaybe = nullptr;
 
 public:
   Optional() : valMaybe(nullptr) {}
-  Optional(T* val) : valMaybe(val) {}
   Optional(T val) : valMaybe(new T{std::move(val)}) {}
-
-  ~Optional() {
-    if (has_value())
-      delete valMaybe;
+  Optional(const Optional<T>& other) {
+    if (other.has_value()) {
+      valMaybe = make_unique<T>(*other.valMaybe);
+    } else {
+      valMaybe = nullptr;
+    }
   }
+  Optional(Optional<T>&& other) = default;
+
+  ~Optional() = default;
+
+  Optional<T>& operator=(const Optional<T>& other) {
+    if (this != &other) {
+      valMaybe.reset();
+      if (other.has_value()) {
+        valMaybe = make_unique<T>(*other.valMaybe);
+      } else {
+        valMaybe = nullptr;
+      }
+    }
+    return *this;
+  }
+
+  Optional<T>& operator=(Optional<T>&& other) = default;
 
   bool has_value() const { return valMaybe != nullptr; }
   T& value() const { return *valMaybe; }
   void set(T val) { 
     if (has_value())
-      delete valMaybe;
-    valMaybe = new T{val};
+      valMaybe.reset();
+    valMaybe = make_unique<T>(std::move(val));
   }
 };
 
