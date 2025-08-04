@@ -134,7 +134,7 @@ std::unique_ptr<std::vector<uint8_t>> CreateJsonDataObject(uint64_t time, uint8_
         jsonDataArray.push_back(data[i]);
     j["data"] = jsonDataArray;
     j["accuracies"] = accuracies;
-    j["has_data"] = has_data
+    j["has_data"] = has_data;
     const auto jsonStr = j.dump();
     return nat::core::make_unique<std::vector<uint8_t>>(std::begin(jsonStr), std::end(jsonStr));
 #else

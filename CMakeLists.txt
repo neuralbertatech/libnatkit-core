@@ -26,6 +26,8 @@ set(LIBNATKIT_CORE_THIRD_PARTY_DIR "${LIBNATKIT_CORE_ROOT}/third-party")
 set(LIBNATKIT_CORE_INCLUDE "${LIBNATKIT_CORE_ROOT}/include")
 set(LIBNATKIT_CORE_HEADER_FILES
   "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.hpp"
+  "${LIBNATKIT_CORE_ROOT}/include/CircularBuffer.hpp"
+  "${LIBNATKIT_CORE_ROOT}/include/SensorBuffer.hpp"
   )
 
 set(LIBNATKIT_CORE_SRC_FILES
@@ -42,23 +44,21 @@ set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/StreamType.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/main.cpp"
   )
 
 
-add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
+#add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
+add_executable(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES})
 set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER ${LIBNATKIT_CORE_HEADER_FILES})
 target_include_directories(libnatkit-core
     PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_INCLUDE}>
+    PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include>
 )
-#target_include_directories(libnatkit-core PRIVATE third-party/cJSON)
-#target_link_libraries(libnatkit-core cjson)
 
 add_library(nlohmann INTERFACE)
 target_include_directories(nlohmann INTERFACE ${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include)
 target_link_libraries(libnatkit-core PUBLIC nlohmann)
-#target_include_directories(libnatkit-core
-#  PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include>
-#)
 
 install(TARGETS libnatkit-core
         CONFIGURATIONS Debug
@@ -102,6 +102,7 @@ idf_component_register(
   "src/StreamType.cpp"
   "src/TopicMessenger.cpp"
   "src/TopicTranslator.cpp"
+  "src/main.cpp"
 
   INCLUDE_DIRS
   "include"
