@@ -48,8 +48,8 @@ set(LIBNATKIT_CORE_SRC_FILES
   )
 
 
-#add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
-add_executable(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES})
+add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
+#add_executable(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES})
 set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER ${LIBNATKIT_CORE_HEADER_FILES})
 target_include_directories(libnatkit-core
     PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_INCLUDE}>
