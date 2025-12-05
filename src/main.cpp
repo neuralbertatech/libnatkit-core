@@ -6,10 +6,10 @@
 
 #define DELAY_BETWEEN_SAMPLES 20000
 
-std::mutex write_mutex{};
-std::mutex read_mutex{};
-bool write = true;
-bool read = true;
+static std::mutex write_mutex{};
+static std::mutex read_mutex{};
+static bool write = true;
+static bool read = true;
 
 uint64_t getCurrentTimeMillis() {
     // Get the current time point from the system clock
