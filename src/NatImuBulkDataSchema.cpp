@@ -238,7 +238,12 @@ namespace nat {
 
         Optional<std::unique_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::decodeBinary(const std::vector<uint8_t>& message) {
             const int singleReadingSizeInBytes = 50;
-            assert(message.size() == singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize);
+            const size_t expectedSize = singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize;
+            if (message.size() != expectedSize) {
+                std::cerr << "NatImuBulkDataSchema::decodeBinary: message size mismatch. Expected " 
+                          << expectedSize << " bytes, got " << message.size() << " bytes.\n";
+                return {};
+            }
             char* bytes = (char*)message.data();
             auto schema = nat::core::make_unique<NatImuBulkDataSchema>();
 
@@ -279,6 +284,8 @@ namespace nat {
             //    return decodeJson(message);
             case SerializationType::Csv:
                 return decodeCsv(message);
+            case SerializationType::Binary:
+                return decodeBinary(message);
             default:
                 assert(0);
             }
@@ -321,6 +328,7 @@ namespace nat {
                 };
             //registry.registerDecoder(name, SerializationType::Json, decoder);
             registry.registerDecoder(name, SerializationType::Csv, decoder);
+            registry.registerDecoder(name, SerializationType::Binary, decoder);
         }
 
         std::string NatImuBulkDataSchema::getName() const { return name; }

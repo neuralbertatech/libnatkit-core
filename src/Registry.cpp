@@ -20,6 +20,7 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   auto registry = nat::core::make_unique<Registry>();
   BasicMetaInfoSchema::registerWithRegistry(*registry);
   NatImuDataSchema::registerWithRegistry(*registry);
+  NatImuBulkDataSchema::registerWithRegistry(*registry);
 
   return registry;
 }

@@ -8,8 +8,8 @@
 
 static std::mutex write_mutex{};
 static std::mutex read_mutex{};
-static bool write = true;
-static bool read = true;
+static bool should_write = true;
+static bool should_read = true;
 
 uint64_t getCurrentTimeMillis() {
     // Get the current time point from the system clock
@@ -38,7 +38,7 @@ void write_thread(std::shared_ptr<SensorBuffer<DataArray<3>>> buffer) {
     while (1) {
         {
             std::lock_guard<std::mutex> gaurd(write_mutex);
-            if (!write) {
+            if (!should_write) {
                 break;
             }
         }
@@ -62,7 +62,7 @@ void read_thread(std::shared_ptr<SensorBuffer<DataArray<3>>> buffer) {
     while (1) {
         {
             std::lock_guard<std::mutex> gaurd(read_mutex);
-            if (!read) {
+            if (!should_read) {
                 break;
             }
         }
@@ -82,14 +82,14 @@ int main() {
 
     {
         std::lock_guard<std::mutex> gaurd(write_mutex);
-        write = false;
+        should_write = false;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     {
         std::lock_guard<std::mutex> gaurd(read_mutex);
-        read = false;
+        should_read = false;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
