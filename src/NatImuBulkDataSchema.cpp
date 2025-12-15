@@ -177,7 +177,9 @@ namespace nat {
                 for (size_t i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i) {
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, data[i].time);
                     for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
-                        dataPointer += Binary::unsafeWriteAsBinaryToArray<uint32_t>(dataPointer, (uint32_t)data[i].data[j]);
+                        // Use memcpy to preserve float bit pattern (not value conversion)
+                        memcpy(dataPointer, &data[i].data[j], sizeof(float));
+                        dataPointer += sizeof(float);
                     }
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint8_t>(dataPointer, static_cast<uint8_t>(data[i].accuracies));
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint8_t>(dataPointer, static_cast<uint8_t>(data[i].has_data));
@@ -250,8 +252,10 @@ namespace nat {
             for (int i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i) {
                 NatImuDataSchema sensorReading{};
                 bytes += Binary::unsafeParseFromBinary(bytes, sensorReading.time);
-                for (int j = 0; j < 13; ++j) {
-                    bytes += Binary::unsafeParseFromBinary<uint32_t>(bytes, *(uint32_t*)&sensorReading.data[j]);
+                for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
+                    // Use memcpy to read float bit pattern directly
+                    memcpy(&sensorReading.data[j], bytes, sizeof(float));
+                    bytes += sizeof(float);
                 }
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.accuracies);
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.has_data);

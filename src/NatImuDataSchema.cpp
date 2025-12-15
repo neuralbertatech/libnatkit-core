@@ -372,5 +372,9 @@ bool NatImuDataSchema::wasDataSetForRotation() const {
   return static_cast<bool>(this->has_data & 1);
 }
 
+const float* NatImuDataSchema::getData() const {
+  return this->data;
+}
+
 } // namespace core
 } // namespace nat

@@ -37,6 +37,8 @@ set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuBulkDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatMuseDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatMuseBulkDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
@@ -90,11 +92,15 @@ install(TARGETS libnatkit-core
 
 else()
 idf_component_register(
-  SRCS 
+  SRCS
   "src/BasicMetaInfoSchema.cpp"
   "src/BasicTopicInformation.cpp"
   "src/JsonDecoder.cpp"
   "src/JsonEncoder.cpp"
+  "src/NatImuDataSchema.cpp"
+  "src/NatImuBulkDataSchema.cpp"
+  "src/NatMuseDataSchema.cpp"
+  "src/NatMuseBulkDataSchema.cpp"
   "src/RawStream.cpp"
   "src/Registry.cpp"
   "src/SerializationType.cpp"
@@ -110,4 +116,13 @@ idf_component_register(
   REQUIRES
   json
   )
+
+# Relax some warnings for ESP-IDF build - libnatkit-core was written for less strict compilers
+target_compile_options(${COMPONENT_LIB} PRIVATE
+  -Wno-error=switch
+  -Wno-error=pessimizing-move
+  -Wno-error=redundant-move
+  -Wno-error=deprecated-copy
+  -Wno-error=implicit-fallthrough
+)
 endif()

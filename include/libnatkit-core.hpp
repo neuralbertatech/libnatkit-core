@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -110,23 +111,15 @@ namespace Binary {
 
 template <typename T>
 inline size_t unsafeWriteAsBinaryToArray(char* array, T value) {
-  //assert(is_trivially_copyable<T>::value);
-  uint8_t mask = -1;
-  for (size_t i = 0; i < sizeof(T); ++i) {
-    *(array + i) = (uint8_t)(value & (T)mask);
-    value >>= 8;
-  }
+  //static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+  memcpy(array, &value, sizeof(T));
   return sizeof(T);
 }
 
 template <typename T>
 inline size_t unsafeParseFromBinary(char* array, T& value) {
-  //assert(is_trivially_copyable<T>::value);
-  value &= 0;
-  for (size_t i = sizeof(T); i > 0; ++i) {
-    value |= *(array + i - 1);
-    value <<= 8;
-  }
+  //static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+  memcpy(&value, array, sizeof(T));
   return sizeof(T);
 }
 
@@ -470,6 +463,8 @@ public:
 
   bool wasDataSetForRotation() const;
 
+  const float* getData() const;
+
 private:
     friend class NatImuBulkDataSchema;
 
@@ -527,6 +522,191 @@ public:
 
     std::unique_ptr<std::vector<NatImuDataSchema>> createImuRecords() const;
 
+};
+
+// Forward declaration
+class NatMuseBulkDataSchema;
+
+class NatMuseDataSchema : public Schema, public Decoder {
+public:
+    // Constants for Muse data sizes
+    static const int EEG_SAMPLES_PER_PACKET = 12;   // 12 samples per EEG packet
+    static const int MOTION_SAMPLES = 3;            // 3 samples per motion packet
+    static const int PPG_SAMPLES = 6;               // 6 samples per PPG packet
+    
+    // has_data bitfield values
+    static const uint8_t HAS_EEG = 0x01;
+    static const uint8_t HAS_ACCEL = 0x02;
+    static const uint8_t HAS_GYRO = 0x04;
+    static const uint8_t HAS_PPG = 0x08;
+
+//private:
+    uint64_t time;              // NTP-synced timestamp (microseconds)
+    uint16_t eeg_sequence;      // EEG packet sequence number
+    uint16_t motion_sequence;   // Motion packet sequence number
+    
+    // EEG: 4 channels × 12 samples = 48 floats (microvolts)
+    float tp9[EEG_SAMPLES_PER_PACKET];    // Left ear
+    float af7[EEG_SAMPLES_PER_PACKET];    // Left forehead
+    float af8[EEG_SAMPLES_PER_PACKET];    // Right forehead
+    float tp10[EEG_SAMPLES_PER_PACKET];   // Right ear
+    
+    // Motion: 3 samples each
+    float accel[MOTION_SAMPLES][3];       // Accelerometer (x,y,z) × 3 samples
+    float gyro[MOTION_SAMPLES][3];        // Gyroscope (x,y,z) × 3 samples
+    
+    // PPG: 3 channels × 6 samples (Muse 2/S only)
+    float ppg0[PPG_SAMPLES];
+    float ppg1[PPG_SAMPLES];
+    float ppg2[PPG_SAMPLES];
+    
+    uint8_t has_data;           // Bitfield: eeg(1), accel(2), gyro(4), ppg(8)
+
+public:
+    static const std::string name;
+
+    NatMuseDataSchema();
+    NatMuseDataSchema(const NatMuseDataSchema& other);
+    NatMuseDataSchema(
+        uint64_t time,
+        uint16_t eeg_sequence,
+        uint16_t motion_sequence,
+        const float tp9_data[EEG_SAMPLES_PER_PACKET],
+        const float af7_data[EEG_SAMPLES_PER_PACKET],
+        const float af8_data[EEG_SAMPLES_PER_PACKET],
+        const float tp10_data[EEG_SAMPLES_PER_PACKET],
+        const float accel_data[MOTION_SAMPLES][3],
+        const float gyro_data[MOTION_SAMPLES][3],
+        const float ppg0_data[PPG_SAMPLES],
+        const float ppg1_data[PPG_SAMPLES],
+        const float ppg2_data[PPG_SAMPLES],
+        uint8_t has_data);
+
+#ifdef SERVER
+    static Optional<std::shared_ptr<NatMuseDataSchema>> tryCreateFromSchema(
+        const Optional<const std::shared_ptr<Schema>>& messageMaybe);
+#endif
+
+    // Setters for building samples incrementally
+    void setEegData(uint16_t sequence, 
+                    const float tp9_data[EEG_SAMPLES_PER_PACKET],
+                    const float af7_data[EEG_SAMPLES_PER_PACKET],
+                    const float af8_data[EEG_SAMPLES_PER_PACKET],
+                    const float tp10_data[EEG_SAMPLES_PER_PACKET]);
+    void setAccelData(uint16_t sequence, const float data[MOTION_SAMPLES][3]);
+    void setGyroData(uint16_t sequence, const float data[MOTION_SAMPLES][3]);
+    void setPpgData(const float ppg0_data[PPG_SAMPLES],
+                    const float ppg1_data[PPG_SAMPLES],
+                    const float ppg2_data[PPG_SAMPLES]);
+    void setTime(uint64_t t);
+
+    // Schema interface
+    virtual std::unique_ptr<std::vector<uint8_t>>
+        encodeToBytes(const SerializationType& type) const override;
+    virtual bool isSerializationTypeSupported(const SerializationType type) const override;
+    virtual std::string toString() const override;
+    virtual std::string getName() const override;
+
+    // Decoder interface
+    virtual Optional<std::shared_ptr<Schema>> tryDecode(
+        const std::vector<uint8_t>& message, const SerializationType& type) const override;
+
+    // Static decode methods
+#ifdef SERVER
+    static Optional<std::unique_ptr<NatMuseDataSchema>> decodeJson(const std::vector<uint8_t>& message);
+#endif
+    static Optional<std::unique_ptr<NatMuseDataSchema>> decodeCsv(const std::vector<uint8_t>& message);
+    static Optional<std::unique_ptr<NatMuseDataSchema>> decodeAll(
+        const std::vector<uint8_t>& message, const SerializationType& type);
+    static void decodeAndDispatch(
+        const std::vector<uint8_t>& message,
+        const SerializationType& type,
+        const std::function<void(const std::shared_ptr<Schema>&)>& dispatchMethod);
+
+    static void registerWithRegistry(Registry& registry);
+
+    // Getters
+    uint64_t getTime() const;
+    uint16_t getEegSequence() const;
+    uint16_t getMotionSequence() const;
+    
+    const float* getTp9() const;
+    const float* getAf7() const;
+    const float* getAf8() const;
+    const float* getTp10() const;
+    
+    const float (*getAccel() const)[3];
+    const float (*getGyro() const)[3];
+    
+    const float* getPpg0() const;
+    const float* getPpg1() const;
+    const float* getPpg2() const;
+    
+    bool hasEegData() const;
+    bool hasAccelData() const;
+    bool hasGyroData() const;
+    bool hasPpgData() const;
+
+private:
+    friend class NatMuseBulkDataSchema;
+};
+
+class NatMuseBulkDataSchema : public Schema, public Decoder {
+public:
+    static const size_t BULK_SIZE = 100;
+    static const size_t SINGLE_SAMPLE_BINARY_SIZE = 349;
+    static const size_t BINARY_BUFFER_SIZE = SINGLE_SAMPLE_BINARY_SIZE * BULK_SIZE; // 34900 bytes
+
+private:
+    NatMuseDataSchema data[BULK_SIZE];
+    uint8_t size;
+
+public:
+    static const std::string name;
+
+    NatMuseBulkDataSchema();
+    NatMuseBulkDataSchema(const NatMuseDataSchema* samples, uint8_t count);
+
+    bool isFull() const;
+    void add(const NatMuseDataSchema& sample);
+    void reset();
+    uint8_t getSize() const;
+    const NatMuseDataSchema* getData() const;
+
+#ifdef SERVER
+    static Optional<std::shared_ptr<NatMuseBulkDataSchema>> tryCreateFromSchema(
+        const Optional<const std::shared_ptr<Schema>>& messageMaybe);
+#endif
+
+    // Schema interface
+    virtual std::unique_ptr<std::vector<uint8_t>>
+        encodeToBytes(const SerializationType& type) const override;
+    virtual bool isSerializationTypeSupported(const SerializationType type) const override;
+    virtual std::string toString() const override;
+    virtual std::string getName() const override;
+
+    // ESP32-friendly in-place encoding (avoids heap allocation)
+    // Returns number of bytes written, or 0 on error
+    // bufferLen must be >= BINARY_BUFFER_SIZE (34900 bytes)
+    size_t encodeToBytesInPlace(uint8_t* buffer, size_t bufferLen) const;
+
+    // Decoder interface
+    virtual Optional<std::shared_ptr<Schema>> tryDecode(
+        const std::vector<uint8_t>& message, const SerializationType& type) const override;
+
+    // Static decode methods
+    static Optional<std::unique_ptr<NatMuseBulkDataSchema>> decodeBinary(const std::vector<uint8_t>& message);
+    static Optional<std::unique_ptr<NatMuseBulkDataSchema>> decodeCsv(const std::vector<uint8_t>& message);
+    static Optional<std::unique_ptr<NatMuseBulkDataSchema>> decodeAll(
+        const std::vector<uint8_t>& message, const SerializationType& type);
+    static void decodeAndDispatch(
+        const std::vector<uint8_t>& message,
+        const SerializationType& type,
+        const std::function<void(const std::shared_ptr<Schema>&)>& dispatchMethod);
+
+    static void registerWithRegistry(Registry& registry);
+
+    std::unique_ptr<std::vector<NatMuseDataSchema>> createMuseRecords() const;
 };
 
 struct BasicTopicInformation {

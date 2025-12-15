@@ -21,6 +21,8 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   BasicMetaInfoSchema::registerWithRegistry(*registry);
   NatImuDataSchema::registerWithRegistry(*registry);
   NatImuBulkDataSchema::registerWithRegistry(*registry);
+  NatMuseDataSchema::registerWithRegistry(*registry);
+  NatMuseBulkDataSchema::registerWithRegistry(*registry);
 
   return registry;
 }
