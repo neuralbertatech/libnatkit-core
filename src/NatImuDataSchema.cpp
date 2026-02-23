@@ -15,13 +15,13 @@ const std::string NatImuDataSchema::name = "NatImuDataSchema";
 const uint32_t NatImuDataSchema::NatImuDataSchemaDataArraySize = 10;
 
 NatImuDataSchema::NatImuDataSchema()
-    : time(0), accuracies(0) {
+    : time(0), accuracies(0), has_data(0) {
     for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
         this->data[i] = 0;
 }
 
 NatImuDataSchema::NatImuDataSchema(const NatImuDataSchema &other)
-    : time(other.time), accuracies(other.accuracies) {
+    : time(other.time), accuracies(other.accuracies), has_data(other.has_data) {
     for (int i = 0; i < NatImuDataSchemaDataArraySize; ++i)
         this->data[i] = other.data[i];
 }
