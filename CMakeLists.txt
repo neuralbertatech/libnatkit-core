@@ -26,6 +26,7 @@ set(LIBNATKIT_CORE_THIRD_PARTY_DIR "${LIBNATKIT_CORE_ROOT}/third-party")
 set(LIBNATKIT_CORE_INCLUDE "${LIBNATKIT_CORE_ROOT}/include")
 set(LIBNATKIT_CORE_HEADER_FILES
   "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core.hpp"
+  "${LIBNATKIT_CORE_ROOT}/include/libnatkit-core-abi.h"
   "${LIBNATKIT_CORE_ROOT}/include/CircularBuffer.hpp"
   "${LIBNATKIT_CORE_ROOT}/include/SensorBuffer.hpp"
   )
@@ -33,26 +34,40 @@ set(LIBNATKIT_CORE_HEADER_FILES
 set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/BasicMetaInfoSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/DataSchemaDescriptor.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgDataSchemaV1.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgDataSchemaV1Descriptor.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgTransformDataSchemaV1.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgTransformDataSchemaV1Descriptor.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatSignalFrameDataSchemaV1.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatSignalFrameDataSchemaV1Descriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/JsonDecoder.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/JsonEncoder.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/MarkerEventV1.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/MetaRecord.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchemaDescriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuBulkDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatMuseDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatMuseDataSchemaDescriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatMuseBulkDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/RawStream.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/Registry.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/SessionMetadataRecord.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/SerializationType.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/Stream.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/StreamStitch.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/StreamType.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/TopicMessenger.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/TopicTranslator.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/TransformProvenanceRecord.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/main.cpp"
   )
 
 
 add_library(libnatkit-core SHARED ${LIBNATKIT_CORE_SRC_FILES})
 #add_executable(libnatkit-core ${LIBNATKIT_CORE_SRC_FILES})
-set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER ${LIBNATKIT_CORE_HEADER_FILES})
+set_target_properties(libnatkit-core PROPERTIES PUBLIC_HEADER "${LIBNATKIT_CORE_HEADER_FILES}")
 target_include_directories(libnatkit-core
     PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_INCLUDE}>
     PUBLIC $<BUILD_INTERFACE:${LIBNATKIT_CORE_THIRD_PARTY_DIR}/nlohmann/include>
@@ -90,24 +105,50 @@ install(TARGETS libnatkit-core
           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Release
 )
 
+# Off by default so the deployed Docker build (cmake --build) stays lean; CI and
+# local dev turn it on with -DLIBNATKIT_CORE_BUILD_TESTS=ON.
+option(LIBNATKIT_CORE_BUILD_TESTS "Build libnatkit-core ABI tests" OFF)
+if(LIBNATKIT_CORE_BUILD_TESTS)
+  enable_testing()
+  add_executable(stream_id_abi_test "${LIBNATKIT_CORE_ROOT}/tests/stream_id_abi_test.cpp")
+  target_link_libraries(stream_id_abi_test PRIVATE libnatkit-core nlohmann)
+  target_compile_definitions(stream_id_abi_test PRIVATE
+    NAT_GOLDEN_FIXTURE_PATH="${LIBNATKIT_CORE_ROOT}/tests/stream_id_golden.json")
+  add_test(NAME stream_id_abi_test COMMAND stream_id_abi_test)
+endif()
+
 else()
 idf_component_register(
   SRCS
   "src/BasicMetaInfoSchema.cpp"
   "src/BasicTopicInformation.cpp"
+  "src/DataSchemaDescriptor.cpp"
+  "src/ExgPillEmgDataSchemaV1.cpp"
+  "src/ExgPillEmgDataSchemaV1Descriptor.cpp"
+  "src/ExgPillEmgTransformDataSchemaV1.cpp"
+  "src/ExgPillEmgTransformDataSchemaV1Descriptor.cpp"
+  "src/NatSignalFrameDataSchemaV1.cpp"
+  "src/NatSignalFrameDataSchemaV1Descriptor.cpp"
   "src/JsonDecoder.cpp"
   "src/JsonEncoder.cpp"
+  "src/MarkerEventV1.cpp"
+  "src/MetaRecord.cpp"
   "src/NatImuDataSchema.cpp"
+  "src/NatImuDataSchemaDescriptor.cpp"
   "src/NatImuBulkDataSchema.cpp"
   "src/NatMuseDataSchema.cpp"
+  "src/NatMuseDataSchemaDescriptor.cpp"
   "src/NatMuseBulkDataSchema.cpp"
   "src/RawStream.cpp"
   "src/Registry.cpp"
+  "src/SessionMetadataRecord.cpp"
   "src/SerializationType.cpp"
   "src/Stream.cpp"
+  "src/StreamStitch.cpp"
   "src/StreamType.cpp"
   "src/TopicMessenger.cpp"
   "src/TopicTranslator.cpp"
+  "src/TransformProvenanceRecord.cpp"
   "src/main.cpp"
 
   INCLUDE_DIRS

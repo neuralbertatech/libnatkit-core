@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -189,6 +190,7 @@ enum class StreamType {
   // Core types
   DATA,
   META,
+  MARKER,
 
   // Execution Extension
   EXECUTION_COMMAND,
@@ -206,6 +208,7 @@ static const std::unordered_map<StreamType, std::string>
     streamTypeToStringMapping = {
         {StreamType::DATA, "Data"},
         {StreamType::META, "Meta"},
+        {StreamType::MARKER, "Marker"},
         {StreamType::EXECUTION_COMMAND, "Command"},
         {StreamType::HARDWARE_STATUS, "Status"},
         {StreamType::HARDWARE_CONFIGURATION, "Configuration"},
@@ -240,6 +243,30 @@ std::string toString(const StreamType &streamType);
 
 Optional<StreamType>
 streamTypeFromString(const std::string &streamTypeString);
+
+struct TimelineInterval {
+  int64_t start_time_us;
+  int64_t end_time_us;
+  int32_t value;
+};
+
+struct TimelinePoint {
+  int64_t time_us;
+  int32_t value;
+};
+
+std::vector<uint32_t> sortTimestampOrder(
+    const std::vector<int64_t> &timestamps);
+
+std::vector<int32_t> assignIntervalsToTimeline(
+    const std::vector<int64_t> &timestamps,
+    const std::vector<TimelineInterval> &intervals,
+    int32_t default_value = -1);
+
+std::vector<int32_t> assignPointsToTimeline(
+    const std::vector<int64_t> &timestamps,
+    const std::vector<TimelinePoint> &points,
+    int32_t default_value = -1);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -330,6 +357,43 @@ class Encoder {
 
 
 class Registry;
+class MetaRecord;
+using meta_record_decoder_t = std::function<
+    Optional<std::unique_ptr<MetaRecord>>(
+        const std::vector<uint8_t>& message,
+        const SerializationType& type,
+        uint16_t recordVersion)>;
+
+class MetaRecord : public Schema, public Decoder {
+public:
+  static const std::string name;
+
+  virtual uint32_t getRecordTypeId() const = 0;
+
+  virtual uint16_t getRecordVersion() const = 0;
+
+  static Optional<std::unique_ptr<MetaRecord>> decodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+
+  static void registerWithRegistry(Registry &registry);
+
+  static void registerMetaRecordType(
+      uint32_t recordTypeId,
+      const meta_record_decoder_t &decoder);
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+};
 
 class BasicMetaInfoSchema : public Schema, public Decoder {
   std::string streamName;
@@ -371,6 +435,658 @@ private:
   static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(const std::vector<uint8_t> &message,
                                     const SerializationType &type);
 
+};
+
+class SessionMetadataRecord : public MetaRecord {
+  std::string sessionId;
+  std::string purpose;
+  std::string participantId;
+  std::string protocolId;
+  std::vector<std::string> deviceIds;
+  std::vector<std::string> tags;
+  std::string notes;
+  uint64_t createdAtUs;
+  uint64_t updatedAtUs;
+
+public:
+  static const std::string name;
+  static const uint32_t recordTypeId;
+  static const uint16_t recordVersion;
+
+  SessionMetadataRecord(
+      const std::string &sessionId,
+      const std::string &purpose,
+      const std::string &participantId,
+      const std::string &protocolId,
+      const std::vector<std::string> &deviceIds,
+      const std::vector<std::string> &tags,
+      const std::string &notes,
+      uint64_t createdAtUs,
+      uint64_t updatedAtUs)
+      : sessionId(sessionId),
+        purpose(purpose),
+        participantId(participantId),
+        protocolId(protocolId),
+        deviceIds(deviceIds),
+        tags(tags),
+        notes(notes),
+        createdAtUs(createdAtUs),
+        updatedAtUs(updatedAtUs) {}
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  virtual uint32_t getRecordTypeId() const override;
+
+  virtual uint16_t getRecordVersion() const override;
+
+  const std::string &getSessionId() const;
+  const std::string &getPurpose() const;
+  const std::string &getParticipantId() const;
+  const std::string &getProtocolId() const;
+  const std::vector<std::string> &getDeviceIds() const;
+  const std::vector<std::string> &getTags() const;
+  const std::string &getNotes() const;
+  uint64_t getCreatedAtUs() const;
+  uint64_t getUpdatedAtUs() const;
+
+  static Optional<std::unique_ptr<SessionMetadataRecord>> decodePayloadJson(
+      const std::vector<uint8_t> &message,
+      uint16_t recordVersion);
+  static Optional<std::unique_ptr<SessionMetadataRecord>> decodePayloadBinary(
+      const std::vector<uint8_t> &message,
+      uint16_t recordVersion);
+  static Optional<std::unique_ptr<MetaRecord>> decodePayloadAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type,
+      uint16_t recordVersion);
+  static void registerWithRegistry(Registry &registry);
+};
+
+class TransformProvenanceRecord : public MetaRecord {
+  std::string outputIdentifier;
+  uint64_t outputStreamId;
+  std::string outputSchemaName;
+  std::string outputTopic;
+  uint64_t sourceStreamId;
+  std::string sourceSchemaName;
+  std::string sourceTopic;
+  std::string transformKind;
+  std::string inputMappingId;
+  std::string configJson;
+  uint64_t createdAtUs;
+
+public:
+  static const std::string name;
+  static const uint32_t recordTypeId;
+  static const uint16_t recordVersion;
+
+  TransformProvenanceRecord(
+      const std::string &outputIdentifier,
+      uint64_t outputStreamId,
+      const std::string &outputSchemaName,
+      const std::string &outputTopic,
+      uint64_t sourceStreamId,
+      const std::string &sourceSchemaName,
+      const std::string &sourceTopic,
+      const std::string &transformKind,
+      const std::string &inputMappingId,
+      const std::string &configJson,
+      uint64_t createdAtUs);
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  virtual uint32_t getRecordTypeId() const override;
+
+  virtual uint16_t getRecordVersion() const override;
+
+  const std::string &getOutputIdentifier() const;
+  uint64_t getOutputStreamId() const;
+  const std::string &getOutputSchemaName() const;
+  const std::string &getOutputTopic() const;
+  uint64_t getSourceStreamId() const;
+  const std::string &getSourceSchemaName() const;
+  const std::string &getSourceTopic() const;
+  const std::string &getTransformKind() const;
+  const std::string &getInputMappingId() const;
+  const std::string &getConfigJson() const;
+  uint64_t getCreatedAtUs() const;
+
+  static Optional<std::unique_ptr<TransformProvenanceRecord>> decodePayloadJson(
+      const std::vector<uint8_t> &message,
+      uint16_t recordVersion);
+  static Optional<std::unique_ptr<TransformProvenanceRecord>>
+  decodePayloadBinary(
+      const std::vector<uint8_t> &message,
+      uint16_t recordVersion);
+  static Optional<std::unique_ptr<MetaRecord>> decodePayloadAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type,
+      uint16_t recordVersion);
+  static void registerWithRegistry(Registry &registry);
+};
+
+class MarkerEventV1 : public Schema, public Decoder {
+  std::string sessionId;
+  std::string markerType;
+  std::string markerId;
+  std::string event;
+  std::string label;
+  uint64_t emittedAtUs;
+  std::string attributesJson;
+
+public:
+  static const std::string name;
+  static const std::string schemaVersion;
+
+  MarkerEventV1(
+      const std::string &sessionId,
+      const std::string &markerType,
+      const std::string &markerId,
+      const std::string &event,
+      const std::string &label,
+      uint64_t emittedAtUs,
+      const std::string &attributesJson = "{}")
+      : sessionId(sessionId),
+        markerType(markerType),
+        markerId(markerId),
+        event(event),
+        label(label),
+        emittedAtUs(emittedAtUs),
+        attributesJson(attributesJson.empty() ? "{}" : attributesJson) {}
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  const std::string &getSessionId() const;
+  const std::string &getMarkerType() const;
+  const std::string &getMarkerId() const;
+  const std::string &getEvent() const;
+  const std::string &getLabel() const;
+  uint64_t getEmittedAtUs() const;
+  const std::string &getAttributesJson() const;
+
+  static Optional<std::unique_ptr<MarkerEventV1>> decodeJson(
+      const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<MarkerEventV1>> decodeBinary(
+      const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<MarkerEventV1>> decodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+  static void registerWithRegistry(Registry &registry);
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+};
+
+class ExgPillEmgDataSchemaV1 : public Schema, public Decoder {
+  std::string deviceId;
+  uint64_t seqNo;
+  uint64_t deviceTsUs;
+  uint32_t sampleRateHz;
+  std::vector<std::string> channelLabels;
+  std::vector<int16_t> samples;
+  uint32_t samplesPerChannel;
+
+public:
+  static const std::string name;
+  static const std::string schemaVersion;
+
+  ExgPillEmgDataSchemaV1();
+  ExgPillEmgDataSchemaV1(
+      const std::string &deviceId,
+      uint64_t seqNo,
+      uint64_t deviceTsUs,
+      uint32_t sampleRateHz,
+      const std::vector<std::string> &channelLabels,
+      const std::vector<int16_t> &samples,
+      uint32_t samplesPerChannel);
+
+#ifdef SERVER
+  static Optional<std::shared_ptr<ExgPillEmgDataSchemaV1>> tryCreateFromSchema(
+      const Optional<const std::shared_ptr<Schema>> &messageMaybe);
+#endif
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  const std::string &getDeviceId() const;
+  uint64_t getSeqNo() const;
+  uint64_t getDeviceTsUs() const;
+  uint32_t getSampleRateHz() const;
+  uint32_t getChannelCount() const;
+  uint32_t getSamplesPerChannel() const;
+  const std::vector<std::string> &getChannelLabels() const;
+  const std::vector<int16_t> &getSamples() const;
+
+  static Optional<std::unique_ptr<ExgPillEmgDataSchemaV1>> decodeJson(
+      const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<ExgPillEmgDataSchemaV1>> decodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+  static void registerWithRegistry(Registry &registry);
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+};
+
+class ExgPillEmgTransformDataSchemaV1 : public Schema, public Decoder {
+  std::string deviceId;
+  uint64_t seqNo;
+  uint64_t deviceTsUs;
+  uint32_t sampleRateHz;
+  std::vector<std::string> channelLabels;
+  std::vector<float> samples;
+  uint32_t samplesPerChannel;
+
+public:
+  static const std::string name;
+  static const std::string schemaVersion;
+
+  ExgPillEmgTransformDataSchemaV1();
+  ExgPillEmgTransformDataSchemaV1(
+      const std::string &deviceId,
+      uint64_t seqNo,
+      uint64_t deviceTsUs,
+      uint32_t sampleRateHz,
+      const std::vector<std::string> &channelLabels,
+      const std::vector<float> &samples,
+      uint32_t samplesPerChannel);
+
+#ifdef SERVER
+  static Optional<std::shared_ptr<ExgPillEmgTransformDataSchemaV1>>
+  tryCreateFromSchema(
+      const Optional<const std::shared_ptr<Schema>> &messageMaybe);
+#endif
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  const std::string &getDeviceId() const;
+  uint64_t getSeqNo() const;
+  uint64_t getDeviceTsUs() const;
+  uint32_t getSampleRateHz() const;
+  uint32_t getChannelCount() const;
+  uint32_t getSamplesPerChannel() const;
+  const std::vector<std::string> &getChannelLabels() const;
+  const std::vector<float> &getSamples() const;
+
+  static Optional<std::unique_ptr<ExgPillEmgTransformDataSchemaV1>> decodeJson(
+      const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<ExgPillEmgTransformDataSchemaV1>> decodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+  static void registerWithRegistry(Registry &registry);
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+};
+
+class NatSignalFrameDataSchemaV1 : public Schema, public Decoder {
+  std::string deviceId;
+  uint64_t seqNo;
+  uint64_t deviceTsUs;
+  uint32_t sampleRateHz;
+  std::vector<std::string> channelLabels;
+  std::vector<float> samples;
+  uint32_t samplesPerChannel;
+
+public:
+  static const std::string name;
+  static const std::string schemaVersion;
+
+  NatSignalFrameDataSchemaV1();
+  NatSignalFrameDataSchemaV1(
+      const std::string &deviceId,
+      uint64_t seqNo,
+      uint64_t deviceTsUs,
+      uint32_t sampleRateHz,
+      const std::vector<std::string> &channelLabels,
+      const std::vector<float> &samples,
+      uint32_t samplesPerChannel);
+
+#ifdef SERVER
+  static Optional<std::shared_ptr<NatSignalFrameDataSchemaV1>>
+  tryCreateFromSchema(
+      const Optional<const std::shared_ptr<Schema>> &messageMaybe);
+#endif
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+
+  virtual std::string getName() const override;
+
+  virtual std::string toString() const override;
+
+  const std::string &getDeviceId() const;
+  uint64_t getSeqNo() const;
+  uint64_t getDeviceTsUs() const;
+  uint32_t getSampleRateHz() const;
+  uint32_t getChannelCount() const;
+  uint32_t getSamplesPerChannel() const;
+  const std::vector<std::string> &getChannelLabels() const;
+  const std::vector<float> &getSamples() const;
+
+  static Optional<std::unique_ptr<NatSignalFrameDataSchemaV1>> decodeJson(
+      const std::vector<uint8_t> &message);
+  static Optional<std::unique_ptr<NatSignalFrameDataSchemaV1>> decodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  virtual Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+  static void registerWithRegistry(Registry &registry);
+
+private:
+  static Optional<std::shared_ptr<Schema>> sharedDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+  static Optional<std::unique_ptr<Schema>> uniqueDecodeAll(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type);
+};
+
+enum class FieldValueType {
+  Bool,
+  Int16,
+  Uint32,
+  Uint64,
+  Float32,
+  Float64,
+  String,
+  Enum,
+  Object,
+  Array,
+};
+
+class SchemaFieldDescriptor {
+  std::string fieldId;
+  std::string label;
+  std::string description;
+  std::string unit;
+  bool optional;
+  FieldValueType valueType;
+  std::vector<std::string> enumValues;
+  std::vector<SchemaFieldDescriptor> childFields;
+  std::shared_ptr<SchemaFieldDescriptor> arrayItemField;
+
+public:
+  SchemaFieldDescriptor();
+  SchemaFieldDescriptor(
+      const std::string &fieldId,
+      const std::string &label,
+      FieldValueType valueType,
+      const std::string &description = std::string{},
+      const std::string &unit = std::string{},
+      bool optional = false,
+      const std::vector<std::string> &enumValues = std::vector<std::string>{},
+      const std::vector<SchemaFieldDescriptor> &childFields =
+          std::vector<SchemaFieldDescriptor>{},
+      const std::shared_ptr<SchemaFieldDescriptor> &arrayItemField =
+          std::shared_ptr<SchemaFieldDescriptor>());
+
+  const std::string &getFieldId() const;
+  const std::string &getLabel() const;
+  const std::string &getDescription() const;
+  const std::string &getUnit() const;
+  bool isOptional() const;
+  FieldValueType getValueType() const;
+  const std::vector<std::string> &getEnumValues() const;
+  const std::vector<SchemaFieldDescriptor> &getChildFields() const;
+  const std::shared_ptr<SchemaFieldDescriptor> &getArrayItemField() const;
+
+  const SchemaFieldDescriptor *findChildField(
+      const std::string &childFieldId) const;
+};
+
+class SchemaPath {
+public:
+  struct Segment {
+    bool isArrayIndex;
+    std::string fieldId;
+    uint32_t arrayIndex;
+
+    Segment();
+    explicit Segment(const std::string &fieldId);
+    explicit Segment(uint32_t arrayIndex);
+  };
+
+private:
+  std::vector<Segment> segments;
+
+public:
+  SchemaPath();
+  explicit SchemaPath(const std::vector<Segment> &segments);
+
+  const std::vector<Segment> &getSegments() const;
+
+  static Optional<SchemaPath> parse(const std::string &path);
+};
+
+class FieldValueRef {
+  union ScalarStorage {
+    bool boolValue;
+    int16_t int16Value;
+    uint32_t uint32Value;
+    uint64_t uint64Value;
+    float float32Value;
+    double float64Value;
+
+    ScalarStorage() : uint64Value(0) {}
+  };
+
+  FieldValueType valueType;
+  const void *valuePtr;
+  size_t elementCount;
+  ScalarStorage scalarStorage;
+
+public:
+  FieldValueRef();
+  FieldValueRef(FieldValueType valueType, const void *valuePtr, size_t elementCount = 0);
+
+  static FieldValueRef fromBool(const bool &value);
+  static FieldValueRef fromInt16(const int16_t &value);
+  static FieldValueRef fromUint32(const uint32_t &value);
+  static FieldValueRef fromUint64(const uint64_t &value);
+  static FieldValueRef fromFloat32(const float &value);
+  static FieldValueRef fromFloat64(const double &value);
+  static FieldValueRef fromString(const std::string &value);
+  static FieldValueRef fromArray(size_t elementCount);
+  static FieldValueRef fromObject();
+
+  FieldValueType getValueType() const;
+  size_t getElementCount() const;
+
+  Optional<bool> getBool() const;
+  Optional<int16_t> getInt16() const;
+  Optional<uint32_t> getUint32() const;
+  Optional<uint64_t> getUint64() const;
+  Optional<float> getFloat32() const;
+  Optional<double> getFloat64() const;
+  Optional<std::string> getString() const;
+};
+
+class DataSchemaDescriptor : public MetaRecord {
+public:
+  virtual std::string getTargetSchemaName() const = 0;
+  virtual uint16_t getDescriptorVersion() const = 0;
+  virtual const SchemaFieldDescriptor &getRootField() const = 0;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const = 0;
+
+  virtual std::unique_ptr<std::vector<uint8_t>>
+  encodeToBytes(const SerializationType &type) const override;
+  virtual bool isSerializationTypeSupported(
+      const SerializationType type) const override;
+  virtual std::string getName() const override;
+  virtual std::string toString() const override;
+  virtual uint32_t getRecordTypeId() const override;
+  virtual uint16_t getRecordVersion() const override;
+
+  Optional<std::string> getString(
+      const Schema &record,
+      const std::string &path) const;
+  Optional<int16_t> getInt16(
+      const Schema &record,
+      const std::string &path) const;
+  Optional<uint32_t> getUint32(
+      const Schema &record,
+      const std::string &path) const;
+  Optional<uint64_t> getUint64(
+      const Schema &record,
+      const std::string &path) const;
+};
+
+class DataSchemaDescriptorRegistry {
+  std::unordered_map<std::string, std::shared_ptr<const DataSchemaDescriptor>>
+      descriptorsBySchemaName;
+
+public:
+  void registerDescriptor(
+      const std::shared_ptr<const DataSchemaDescriptor> &descriptor);
+  Optional<std::shared_ptr<const DataSchemaDescriptor>> findBySchemaName(
+      const std::string &schemaName) const;
+
+  static DataSchemaDescriptorRegistry &getDefault();
+};
+
+class ExgPillEmgDataSchemaV1Descriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
+class ExgPillEmgTransformDataSchemaV1Descriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
+class NatSignalFrameDataSchemaV1Descriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
+class NatImuDataSchemaDescriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
+class NatMuseDataSchemaDescriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
 };
 
 class NatImuBulkDataSchema;
@@ -709,6 +1425,12 @@ public:
     std::unique_ptr<std::vector<NatMuseDataSchema>> createMuseRecords() const;
 };
 
+// Stable FNV-1a stream id for a (namespace, identifier) pair, masked to 63 bits
+// with a 0 result remapped to 1. Single source of truth for both the C++
+// backend and, via nat_core_v1_stream_id, every non-C++ binding.
+uint64_t stableStreamId(const std::string &topic_namespace,
+                        const std::string &identifier);
+
 struct BasicTopicInformation {
   const StreamType type;
   const SerializationType serializationType;
@@ -876,6 +1598,10 @@ class TopicMessenger {
   
   void sendMessage(const Schema &schema);
 
+  void sendRawMessage(std::unique_ptr<message_t> &&message);
+
+  void sendRawMessage(const message_t &message);
+
   StreamType getStreamType() const;
 
   SerializationType getSerializationType() const;
@@ -883,6 +1609,8 @@ class TopicMessenger {
   uint64_t getId() const;
 
   std::string getSchemaName() const;
+
+  Optional<std::shared_ptr<message_t>> tryGetNextRawMessage();
 
   Optional<std::unique_ptr<Schema>> tryGetNexMessage();
 
@@ -894,3 +1622,8 @@ class TopicMessenger {
 
 } // namespace core
 } // namespace nat
+
+// The stable C ABI lives in its own pure-C header so FFI generators can parse
+// it; the declarations are shared by every non-C++ binding. See that file for
+// the ABI conventions.
+#include "libnatkit-core-abi.h"

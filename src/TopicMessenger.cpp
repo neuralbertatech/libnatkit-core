@@ -10,6 +10,17 @@ namespace core {
     }
   }
 
+  void TopicMessenger::sendRawMessage(std::unique_ptr<message_t> &&message) {
+    if (message) {
+      messagingQueue->enqueueMessageToSend(std::move(message));
+    }
+  }
+
+  void TopicMessenger::sendRawMessage(const message_t &message) {
+    messagingQueue->enqueueMessageToSend(
+        nat::core::make_unique<message_t>(message.begin(), message.end()));
+  }
+
   StreamType TopicMessenger::getStreamType() const {
       return translator->getStreamType();
   }
@@ -26,8 +37,12 @@ namespace core {
       return translator->getSchemaName();
   }
 
+  Optional<std::shared_ptr<message_t>> TopicMessenger::tryGetNextRawMessage() {
+    return messagingQueue->tryGetNextMessage();
+  }
+
   Optional<std::unique_ptr<Schema>> TopicMessenger::tryGetNexMessage() {
-    const auto message = messagingQueue->tryGetNextMessage();
+    const auto message = tryGetNextRawMessage();
     if (message.has_value()) {
       return translator->tryDecodeMessage(*message.value());
     } else {

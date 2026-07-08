@@ -19,6 +19,13 @@ namespace core {
 std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   auto registry = nat::core::make_unique<Registry>();
   BasicMetaInfoSchema::registerWithRegistry(*registry);
+  MetaRecord::registerWithRegistry(*registry);
+  SessionMetadataRecord::registerWithRegistry(*registry);
+  TransformProvenanceRecord::registerWithRegistry(*registry);
+  MarkerEventV1::registerWithRegistry(*registry);
+  ExgPillEmgDataSchemaV1::registerWithRegistry(*registry);
+  ExgPillEmgTransformDataSchemaV1::registerWithRegistry(*registry);
+  NatSignalFrameDataSchemaV1::registerWithRegistry(*registry);
   NatImuDataSchema::registerWithRegistry(*registry);
   NatImuBulkDataSchema::registerWithRegistry(*registry);
   NatMuseDataSchema::registerWithRegistry(*registry);

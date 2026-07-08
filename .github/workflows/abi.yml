@@ -1,0 +1,33 @@
+name: libnatkit-core ABI
+
+# Builds libnatkit-core standalone, runs the golden-vector ABI test, and guards
+# the exported C ABI against accidental breaking changes (append-only policy in
+# docs/ABI_CONVENTIONS.md).
+
+on:
+  push:
+    branches: [ "trunk", "main" ]
+  pull_request:
+
+jobs:
+  abi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DSTANDARD_BUILD=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DLIBNATKIT_CORE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Golden-vector ABI test
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Exported-symbol ABI diff
+        run: ./scripts/check_abi_symbols.sh build/liblibnatkit-core.so
