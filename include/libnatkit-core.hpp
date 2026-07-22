@@ -331,6 +331,13 @@ class Schema {
     virtual std::string getName() const = 0;
 
     virtual std::string toString() const = 0;
+
+    // Timestamped: every message carries a microsecond timestamp on one uniform
+    // axis so the time model (scrubbing, alignment, combine) can operate without
+    // per-schema knowledge. Data frames return device_ts_us, markers return
+    // emitted_at_us, meta records their created/updated time. The default (0)
+    // means "no timestamp"; timestamped schemas override it.
+    virtual uint64_t getTimestampUs() const { return 0; }
 };
 
 using decoder_t = std::function<Optional<std::unique_ptr<Schema>>(const std::vector<uint8_t>& message, const SerializationType& type)>;
@@ -628,6 +635,9 @@ public:
   uint64_t getEmittedAtUs() const;
   const std::string &getAttributesJson() const;
 
+  // Timestamped: a marker's time axis is emitted_at_us.
+  uint64_t getTimestampUs() const override { return emittedAtUs; }
+
   static Optional<std::unique_ptr<MarkerEventV1>> decodeJson(
       const std::vector<uint8_t> &message);
   static Optional<std::unique_ptr<MarkerEventV1>> decodeBinary(
@@ -696,6 +706,9 @@ public:
   const std::vector<std::string> &getChannelLabels() const;
   const std::vector<int16_t> &getSamples() const;
 
+  // Timestamped: a data frame's time axis is device_ts_us.
+  uint64_t getTimestampUs() const override { return deviceTsUs; }
+
   static Optional<std::unique_ptr<ExgPillEmgDataSchemaV1>> decodeJson(
       const std::vector<uint8_t> &message);
   static Optional<std::unique_ptr<ExgPillEmgDataSchemaV1>> decodeAll(
@@ -763,6 +776,9 @@ public:
   const std::vector<std::string> &getChannelLabels() const;
   const std::vector<float> &getSamples() const;
 
+  // Timestamped: a transform-output frame's time axis is device_ts_us.
+  uint64_t getTimestampUs() const override { return deviceTsUs; }
+
   static Optional<std::unique_ptr<ExgPillEmgTransformDataSchemaV1>> decodeJson(
       const std::vector<uint8_t> &message);
   static Optional<std::unique_ptr<ExgPillEmgTransformDataSchemaV1>> decodeAll(
@@ -829,6 +845,9 @@ public:
   uint32_t getSamplesPerChannel() const;
   const std::vector<std::string> &getChannelLabels() const;
   const std::vector<float> &getSamples() const;
+
+  // Timestamped: a signal-frame's time axis is device_ts_us.
+  uint64_t getTimestampUs() const override { return deviceTsUs; }
 
   static Optional<std::unique_ptr<NatSignalFrameDataSchemaV1>> decodeJson(
       const std::vector<uint8_t> &message);
@@ -1498,6 +1517,13 @@ public:
   virtual Optional<std::shared_ptr<message_t>> tryGetNextMessage() = 0;
 
   virtual void clearAllMessages() = 0;
+
+  // Block until every message enqueued for sending has actually been handed to
+  // the transport. Default is a no-op for queues that send synchronously; the
+  // Kafka queue overrides it to drain its async send queue. Callers that
+  // produce-then-exit (one-shot publishers) must call this before destroying
+  // the messenger or in-flight messages can be lost.
+  virtual void flush() {}
 };
 
 class PlainTextMessage {
@@ -1615,6 +1641,8 @@ class TopicMessenger {
   Optional<std::unique_ptr<Schema>> tryGetNexMessage();
 
   void clearAllMessages();
+
+  void flush();
 };
 
 

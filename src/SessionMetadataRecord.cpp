@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <sstream>
 
 namespace nat {
@@ -19,13 +20,12 @@ const uint32_t SessionMetadataRecord::recordTypeId = 1;
 const uint16_t SessionMetadataRecord::recordVersion = 1;
 
 static void ensureSessionMetadataRecordRegisteredForMetaRecord() {
-  static bool registered = false;
-  if (!registered) {
+  static std::once_flag registeredFlag;
+  std::call_once(registeredFlag, [] {
     nat::core::MetaRecord::registerMetaRecordType(
         nat::core::SessionMetadataRecord::recordTypeId,
         nat::core::SessionMetadataRecord::decodePayloadAll);
-    registered = true;
-  }
+  });
 }
 
 namespace {

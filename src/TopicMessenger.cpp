@@ -54,5 +54,9 @@ namespace core {
       messagingQueue->clearAllMessages();
   }
 
+  void TopicMessenger::flush() {
+      messagingQueue->flush();
+  }
+
 } // namespace core
 } // namespace nat

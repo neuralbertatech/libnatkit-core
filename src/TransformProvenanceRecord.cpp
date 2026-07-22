@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <sstream>
 
 namespace nat {
@@ -19,13 +20,12 @@ const uint32_t TransformProvenanceRecord::recordTypeId = 2;
 const uint16_t TransformProvenanceRecord::recordVersion = 1;
 
 static void ensureTransformProvenanceRecordRegisteredForMetaRecord() {
-  static bool registered = false;
-  if (!registered) {
+  static std::once_flag registeredFlag;
+  std::call_once(registeredFlag, [] {
     nat::core::MetaRecord::registerMetaRecordType(
         nat::core::TransformProvenanceRecord::recordTypeId,
         nat::core::TransformProvenanceRecord::decodePayloadAll);
-    registered = true;
-  }
+  });
 }
 
 namespace {

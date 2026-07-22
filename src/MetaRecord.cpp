@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 namespace nat {
 namespace core {
@@ -29,6 +30,28 @@ static Optional<std::shared_ptr<Schema>> convertUniqueMetaRecord(
 static std::unordered_map<uint32_t, meta_record_decoder_t> &metaRecordDecoders() {
   static std::unordered_map<uint32_t, meta_record_decoder_t> decoders{};
   return decoders;
+}
+
+// Guards every access (read and write) to metaRecordDecoders(). ctypes releases
+// the GIL, so concurrent Python threads genuinely enter the ABI at once: a
+// broker-create on one thread registering a type while another thread decodes a
+// meta record would otherwise race the unordered_map. See docs/ABI_CONVENTIONS.md.
+static std::mutex &metaRecordDecodersMutex() {
+  static std::mutex mutex{};
+  return mutex;
+}
+
+// Copies the decoder out under the lock and returns it, so the (potentially
+// slow) decode itself runs outside the critical section.
+static Optional<meta_record_decoder_t> findMetaRecordDecoder(
+    uint32_t recordTypeId) {
+  std::lock_guard<std::mutex> lock(metaRecordDecodersMutex());
+  auto &decoders = metaRecordDecoders();
+  const auto search = decoders.find(recordTypeId);
+  if (search == decoders.end()) {
+    return {};
+  }
+  return Optional<meta_record_decoder_t>{search->second};
 }
 
 static bool readBinaryHeader(
@@ -64,11 +87,11 @@ static Optional<std::unique_ptr<MetaRecord>> decodeJsonMessage(
   const auto payloadJson = json["payload"];
   const auto payloadStr = payloadJson.dump();
   const std::vector<uint8_t> payload(payloadStr.begin(), payloadStr.end());
-  const auto search = metaRecordDecoders().find(recordTypeId);
-  if (search == metaRecordDecoders().end()) {
+  const auto decoder = findMetaRecordDecoder(recordTypeId);
+  if (!decoder.has_value()) {
     return {};
   }
-  return search->second(payload, SerializationType::Json, recordVersion);
+  return decoder.value()(payload, SerializationType::Json, recordVersion);
 }
 #else
 static Optional<std::unique_ptr<MetaRecord>> decodeJsonMessage(
@@ -104,13 +127,13 @@ static Optional<std::unique_ptr<MetaRecord>> decodeJsonMessage(
   free(payloadChars);
   cJSON_Delete(json);
 
-  const auto search = metaRecordDecoders().find(recordTypeId);
-  if (search == metaRecordDecoders().end()) {
+  const auto decoder = findMetaRecordDecoder(recordTypeId);
+  if (!decoder.has_value()) {
     return {};
   }
 
   const std::vector<uint8_t> payload(payloadStr.begin(), payloadStr.end());
-  return search->second(payload, SerializationType::Json, recordVersion);
+  return decoder.value()(payload, SerializationType::Json, recordVersion);
 }
 #endif
 
@@ -123,11 +146,11 @@ static Optional<std::unique_ptr<MetaRecord>> decodeBinaryMessage(
     return {};
   }
 
-  const auto search = metaRecordDecoders().find(recordTypeId);
-  if (search == metaRecordDecoders().end()) {
+  const auto decoder = findMetaRecordDecoder(recordTypeId);
+  if (!decoder.has_value()) {
     return {};
   }
-  return search->second(payload, SerializationType::Binary, recordVersion);
+  return decoder.value()(payload, SerializationType::Binary, recordVersion);
 }
 
 } // namespace
@@ -159,6 +182,7 @@ void MetaRecord::registerWithRegistry(Registry &registry) {
 void MetaRecord::registerMetaRecordType(
     uint32_t recordTypeId,
     const meta_record_decoder_t &decoder) {
+  std::lock_guard<std::mutex> lock(metaRecordDecodersMutex());
   auto &decoders = metaRecordDecoders();
   const auto search = decoders.find(recordTypeId);
   if (search == decoders.end()) {
