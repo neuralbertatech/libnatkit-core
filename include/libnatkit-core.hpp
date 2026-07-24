@@ -1209,8 +1209,23 @@ class NatImuBulkDataSchema : public Schema, public Decoder {
     NatImuDataSchema data[100];
     uint8_t size;
 
+    // Frame envelope (see kFrameHeaderSize). deviceTsUs is the timestamp of the
+    // first sample in microseconds; seqNo is a monotonic per-device frame
+    // counter; sampleRateHz is the per-frame sampling rate.
+    uint16_t schemaVersion;
+    uint32_t sampleRateHz;
+    uint64_t seqNo;
+    uint64_t deviceTsUs;
+
 public:
     static const std::string name;
+
+    // Binary wire format: a fixed 24-byte little-endian header followed by
+    // `sampleCount` fixed-size samples.
+    //   uint16 schemaVersion | uint16 sampleCount | uint32 sampleRateHz
+    //   uint64 seqNo         | uint64 deviceTsUs
+    static const uint16_t kFrameSchemaVersion;
+    static const size_t kFrameHeaderSize;
 
     NatImuBulkDataSchema();
 
@@ -1221,6 +1236,16 @@ public:
     void add(const NatImuDataSchema& datum);
 
     void setData(const NatImuDataSchema* data, int32_t size);
+
+    // Populate the frame envelope prior to encoding. schemaVersion is left at
+    // kFrameSchemaVersion.
+    void setFrameHeader(uint64_t seqNo, uint64_t deviceTsUs, uint32_t sampleRateHz);
+
+    uint16_t getSchemaVersion() const;
+    uint64_t getSeqNo() const;
+    uint64_t getDeviceTsUs() const;
+    uint32_t getSampleRateHz() const;
+    uint8_t getSampleCount() const;
 
 #ifdef SERVER
     static Optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);

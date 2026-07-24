@@ -12,20 +12,34 @@ namespace nat {
     namespace core {
 
         const std::string NatImuBulkDataSchema::name = "NatImuBulkDataSchema";
+        const uint16_t NatImuBulkDataSchema::kFrameSchemaVersion = 1;
+        const size_t NatImuBulkDataSchema::kFrameHeaderSize = 24;
         static const int NatImuBulkDataSchemaDataArraySize = 100;
 
         NatImuBulkDataSchema::NatImuBulkDataSchema()
-            : size(0) {
+            : size(0), schemaVersion(kFrameSchemaVersion), sampleRateHz(0), seqNo(0), deviceTsUs(0) {
             for (size_t i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i)
                 data[i] = NatImuDataSchema{};
         }
 
         NatImuBulkDataSchema::NatImuBulkDataSchema(const NatImuDataSchema* data, uint8_t size)
-            : size(size) {
+            : size(size), schemaVersion(kFrameSchemaVersion), sampleRateHz(0), seqNo(0), deviceTsUs(0) {
             assert(size <= NatImuBulkDataSchemaDataArraySize);
             for (int i = 0; i < size; ++i)
                 this->data[i] = data[i];
         }
+
+        void NatImuBulkDataSchema::setFrameHeader(uint64_t seqNo, uint64_t deviceTsUs, uint32_t sampleRateHz) {
+            this->seqNo = seqNo;
+            this->deviceTsUs = deviceTsUs;
+            this->sampleRateHz = sampleRateHz;
+        }
+
+        uint16_t NatImuBulkDataSchema::getSchemaVersion() const { return schemaVersion; }
+        uint64_t NatImuBulkDataSchema::getSeqNo() const { return seqNo; }
+        uint64_t NatImuBulkDataSchema::getDeviceTsUs() const { return deviceTsUs; }
+        uint32_t NatImuBulkDataSchema::getSampleRateHz() const { return sampleRateHz; }
+        uint8_t NatImuBulkDataSchema::getSampleCount() const { return size; }
 
         bool NatImuBulkDataSchema::isFull() const {
             return size == NatImuBulkDataSchemaDataArraySize;
@@ -152,7 +166,6 @@ namespace nat {
 
         std::unique_ptr<std::vector<uint8_t>>
             NatImuBulkDataSchema::encodeToBytes(const SerializationType& type) const {
-            assert(isFull());
             switch (type) {
             //case SerializationType::Json:
             //    return CreateJsonDataObject(this->time, convertSensorAccuracyToInt(this->accuracy), this->data);
@@ -172,9 +185,19 @@ namespace nat {
 
             case SerializationType::Binary: {
                 const int singleReadingSizeInBytes = 50;
-                auto bytes = nat::core::make_unique<std::vector<uint8_t>>(singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize, 0);
+                const uint16_t sampleCount = static_cast<uint16_t>(size);
+                const size_t totalSize = kFrameHeaderSize + static_cast<size_t>(singleReadingSizeInBytes) * sampleCount;
+                auto bytes = nat::core::make_unique<std::vector<uint8_t>>(totalSize, 0);
                 char* dataPointer = (char*)bytes->data();
-                for (size_t i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i) {
+
+                // Frame header (24 bytes, little-endian).
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint16_t>(dataPointer, schemaVersion);
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint16_t>(dataPointer, sampleCount);
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint32_t>(dataPointer, sampleRateHz);
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, seqNo);
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, deviceTsUs);
+
+                for (size_t i = 0; i < sampleCount; ++i) {
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, data[i].time);
                     for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
                         // Use memcpy to preserve float bit pattern (not value conversion)
@@ -185,9 +208,9 @@ namespace nat {
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint8_t>(dataPointer, static_cast<uint8_t>(data[i].has_data));
                 }
                 size_t pointerDiff = (size_t)dataPointer - (size_t)bytes->data();
-                size_t bytesSize = bytes->size();
-                assert(pointerDiff == (singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize));
-                assert(bytesSize == (singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize));
+                assert(pointerDiff == totalSize);
+                assert(bytes->size() == totalSize);
+                (void)pointerDiff;
                 return bytes;
             }
             }
@@ -240,16 +263,12 @@ namespace nat {
 
         Optional<std::unique_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::decodeBinary(const std::vector<uint8_t>& message) {
             const int singleReadingSizeInBytes = 50;
-            const size_t expectedSize = singleReadingSizeInBytes * NatImuBulkDataSchemaDataArraySize;
-            if (message.size() != expectedSize) {
-                std::cerr << "NatImuBulkDataSchema::decodeBinary: message size mismatch. Expected " 
-                          << expectedSize << " bytes, got " << message.size() << " bytes.\n";
-                return {};
-            }
-            char* bytes = (char*)message.data();
+            const size_t legacySize = static_cast<size_t>(singleReadingSizeInBytes) * NatImuBulkDataSchemaDataArraySize; // 5000
+
             auto schema = nat::core::make_unique<NatImuBulkDataSchema>();
 
-            for (int i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i) {
+            // Reads one fixed-size sample from `bytes`, advancing the pointer.
+            const auto readSample = [&](char*& bytes) {
                 NatImuDataSchema sensorReading{};
                 bytes += Binary::unsafeParseFromBinary(bytes, sensorReading.time);
                 for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
@@ -260,7 +279,52 @@ namespace nat {
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.accuracies);
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.has_data);
                 schema->add(sensorReading);
+            };
+
+            // Legacy headerless format: exactly 100 samples, no frame envelope.
+            // (A framed message is never exactly 5000 bytes: 24 + n*50 == 5000
+            // has no integer solution, so this sentinel is unambiguous.)
+            if (message.size() == legacySize) {
+                char* bytes = (char*)message.data();
+                for (int i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i)
+                    readSample(bytes);
+                return std::move(schema);
             }
+
+            if (message.size() < kFrameHeaderSize) {
+                std::cerr << "NatImuBulkDataSchema::decodeBinary: message too small for header ("
+                          << message.size() << " < " << kFrameHeaderSize << " bytes).\n";
+                return {};
+            }
+
+            char* bytes = (char*)message.data();
+            uint16_t decodedSchemaVersion = 0;
+            uint16_t sampleCount = 0;
+            uint32_t decodedSampleRateHz = 0;
+            uint64_t decodedSeqNo = 0;
+            uint64_t decodedDeviceTsUs = 0;
+            bytes += Binary::unsafeParseFromBinary<uint16_t>(bytes, decodedSchemaVersion);
+            bytes += Binary::unsafeParseFromBinary<uint16_t>(bytes, sampleCount);
+            bytes += Binary::unsafeParseFromBinary<uint32_t>(bytes, decodedSampleRateHz);
+            bytes += Binary::unsafeParseFromBinary<uint64_t>(bytes, decodedSeqNo);
+            bytes += Binary::unsafeParseFromBinary<uint64_t>(bytes, decodedDeviceTsUs);
+
+            if (sampleCount > NatImuBulkDataSchemaDataArraySize) {
+                std::cerr << "NatImuBulkDataSchema::decodeBinary: sampleCount " << sampleCount
+                          << " exceeds capacity " << NatImuBulkDataSchemaDataArraySize << ".\n";
+                return {};
+            }
+            const size_t expectedSize = kFrameHeaderSize + static_cast<size_t>(singleReadingSizeInBytes) * sampleCount;
+            if (message.size() != expectedSize) {
+                std::cerr << "NatImuBulkDataSchema::decodeBinary: framed message size mismatch. Expected "
+                          << expectedSize << " bytes, got " << message.size() << " bytes.\n";
+                return {};
+            }
+
+            for (int i = 0; i < sampleCount; ++i)
+                readSample(bytes);
+            schema->setFrameHeader(decodedSeqNo, decodedDeviceTsUs, decodedSampleRateHz);
+            schema->schemaVersion = decodedSchemaVersion;
             return std::move(schema);
         }
 
