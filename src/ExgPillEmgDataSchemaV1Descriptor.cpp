@@ -107,7 +107,7 @@ Optional<FieldValueRef> ExgPillEmgDataSchemaV1Descriptor::tryGetFieldValue(
   }
 
   const ExgPillEmgDataSchemaV1 *emgRecord =
-      dynamic_cast<const ExgPillEmgDataSchemaV1 *>(&record);
+      (record.getName() == ExgPillEmgDataSchemaV1::name ? static_cast<const ExgPillEmgDataSchemaV1 *>(&record) : nullptr);
   if (emgRecord == nullptr) {
     return {};
   }

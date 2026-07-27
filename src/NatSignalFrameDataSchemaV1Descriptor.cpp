@@ -109,7 +109,7 @@ Optional<FieldValueRef> NatSignalFrameDataSchemaV1Descriptor::tryGetFieldValue(
   }
 
   const NatSignalFrameDataSchemaV1 *signalRecord =
-      dynamic_cast<const NatSignalFrameDataSchemaV1 *>(&record);
+      (record.getName() == NatSignalFrameDataSchemaV1::name ? static_cast<const NatSignalFrameDataSchemaV1 *>(&record) : nullptr);
   if (signalRecord == nullptr) {
     return {};
   }

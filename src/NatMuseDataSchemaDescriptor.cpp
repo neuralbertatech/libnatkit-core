@@ -232,7 +232,7 @@ Optional<FieldValueRef> NatMuseDataSchemaDescriptor::tryGetFieldValue(
   }
 
   const NatMuseDataSchema *museRecord =
-      dynamic_cast<const NatMuseDataSchema *>(&record);
+      (record.getName() == NatMuseDataSchema::name ? static_cast<const NatMuseDataSchema *>(&record) : nullptr);
   if (museRecord == nullptr) {
     return {};
   }

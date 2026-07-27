@@ -163,7 +163,7 @@ Optional<FieldValueRef> NatImuDataSchemaDescriptor::tryGetFieldValue(
   }
 
   const NatImuDataSchema *imuRecord =
-      dynamic_cast<const NatImuDataSchema *>(&record);
+      (record.getName() == NatImuDataSchema::name ? static_cast<const NatImuDataSchema *>(&record) : nullptr);
   if (imuRecord == nullptr) {
     return {};
   }

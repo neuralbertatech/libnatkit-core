@@ -556,7 +556,7 @@ int nat_session_metadata_record_decode_json(const uint8_t *message,
   }
 
   nat::core::SessionMetadataRecord *record =
-      dynamic_cast<nat::core::SessionMetadataRecord *>(recordMaybe.value().get());
+      (recordMaybe.value()->getName() == nat::core::SessionMetadataRecord::name ? static_cast<nat::core::SessionMetadataRecord *>(recordMaybe.value().get()) : nullptr);
   if (record == nullptr) {
     return 3;
   }

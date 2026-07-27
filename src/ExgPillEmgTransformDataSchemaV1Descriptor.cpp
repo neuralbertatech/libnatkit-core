@@ -113,7 +113,7 @@ ExgPillEmgTransformDataSchemaV1Descriptor::tryGetFieldValue(
   }
 
   const ExgPillEmgTransformDataSchemaV1 *emgRecord =
-      dynamic_cast<const ExgPillEmgTransformDataSchemaV1 *>(&record);
+      (record.getName() == ExgPillEmgTransformDataSchemaV1::name ? static_cast<const ExgPillEmgTransformDataSchemaV1 *>(&record) : nullptr);
   if (emgRecord == nullptr) {
     return {};
   }
