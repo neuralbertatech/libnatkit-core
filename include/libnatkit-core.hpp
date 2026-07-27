@@ -28,43 +28,56 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 template <typename T>
 class Optional {
-  std::unique_ptr<T> valMaybe = nullptr;
+  // Value stored INLINE (in-object), like std::optional — NO heap allocation.
+  // Previously wrapped std::unique_ptr<T>, which heap-allocated the value on
+  // every copy (root cause of the natKit-IMU per-sample std::bad_alloc). This
+  // requires a COMPLETE T at each instantiation (the old pointer form did not).
+  alignas(T) unsigned char storage_[sizeof(T)];
+  bool present_ = false;
+
+  T* ptr_() { return reinterpret_cast<T*>(&storage_[0]); }
+  const T* ptr_() const { return reinterpret_cast<const T*>(&storage_[0]); }
 
 public:
-  Optional() : valMaybe(nullptr) {}
-  Optional(T val) : valMaybe(new T{std::move(val)}) {}
-  Optional(const Optional<T>& other) {
-    if (other.has_value()) {
-      valMaybe = make_unique<T>(*other.valMaybe);
-    } else {
-      valMaybe = nullptr;
-    }
-  }
-  Optional(Optional<T>&& other) = default;
+  Optional() : present_(false) {}
+  Optional(T val) : present_(true) { new (ptr_()) T(std::move(val)); }
 
-  ~Optional() = default;
+  Optional(const Optional<T>& other) : present_(other.present_) {
+    if (present_) new (ptr_()) T(*other.ptr_());
+  }
+
+  // Move leaves the source EMPTY, matching the prior unique_ptr-based move.
+  Optional(Optional<T>&& other) : present_(other.present_) {
+    if (present_) { new (ptr_()) T(std::move(*other.ptr_())); other.reset(); }
+  }
+
+  ~Optional() { reset(); }
 
   Optional<T>& operator=(const Optional<T>& other) {
     if (this != &other) {
-      valMaybe.reset();
-      if (other.has_value()) {
-        valMaybe = make_unique<T>(*other.valMaybe);
-      } else {
-        valMaybe = nullptr;
+      reset();
+      if (other.present_) { new (ptr_()) T(*other.ptr_()); present_ = true; }
+    }
+    return *this;
+  }
+
+  Optional<T>& operator=(Optional<T>&& other) {
+    if (this != &other) {
+      reset();
+      if (other.present_) {
+        new (ptr_()) T(std::move(*other.ptr_()));
+        present_ = true;
+        other.reset();
       }
     }
     return *this;
   }
 
-  Optional<T>& operator=(Optional<T>&& other) = default;
+  void reset() { if (present_) { ptr_()->~T(); present_ = false; } }
 
-  bool has_value() const { return valMaybe != nullptr; }
-  T& value() const { return *valMaybe; }
-  void set(T val) { 
-    if (has_value())
-      valMaybe.reset();
-    valMaybe = make_unique<T>(std::move(val));
-  }
+  bool has_value() const { return present_; }
+  T& value() const { return *const_cast<Optional<T>*>(this)->ptr_(); }
+  void set(T val) { reset(); new (ptr_()) T(std::move(val)); present_ = true; }
 };
 
 namespace Strings {
