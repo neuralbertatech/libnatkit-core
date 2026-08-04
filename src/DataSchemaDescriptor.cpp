@@ -391,6 +391,7 @@ DataSchemaDescriptorRegistry &DataSchemaDescriptorRegistry::getDefault() {
     ExgPillEmgTransformDataSchemaV1Descriptor::registerWithRegistry(registry);
     NatSignalFrameDataSchemaV1Descriptor::registerWithRegistry(registry);
     NatImuDataSchemaDescriptor::registerWithRegistry(registry);
+    NatImuBulkDataSchemaDescriptor::registerWithRegistry(registry);
     NatMuseDataSchemaDescriptor::registerWithRegistry(registry);
     initialized = true;
   }

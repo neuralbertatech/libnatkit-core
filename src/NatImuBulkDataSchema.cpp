@@ -40,6 +40,7 @@ namespace nat {
         uint64_t NatImuBulkDataSchema::getDeviceTsUs() const { return deviceTsUs; }
         uint32_t NatImuBulkDataSchema::getSampleRateHz() const { return sampleRateHz; }
         uint8_t NatImuBulkDataSchema::getSampleCount() const { return size; }
+        const NatImuDataSchema* NatImuBulkDataSchema::getSamples() const { return data; }
 
         bool NatImuBulkDataSchema::isFull() const {
             return size == NatImuBulkDataSchemaDataArraySize;

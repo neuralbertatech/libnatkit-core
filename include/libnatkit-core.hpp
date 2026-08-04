@@ -1121,6 +1121,26 @@ public:
   static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
 };
 
+// Channel-major view of a NatImuBulkDataSchema frame: exposes the frame envelope
+// (seq_no/device_ts_us/sample_rate_hz) plus per-axis Float32 sample arrays
+// (accel_x..gyro_z) projected across the bulk's samples. This is what lets the
+// (sample-major) IMU stream satisfy the transform pipeline's channel-frame input
+// contract without changing the wire format.
+class NatImuBulkDataSchemaDescriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
 class NatImuBulkDataSchema;
 
 class NatImuDataSchema: public Schema, public Decoder {
@@ -1259,6 +1279,11 @@ public:
     uint64_t getDeviceTsUs() const;
     uint32_t getSampleRateHz() const;
     uint8_t getSampleCount() const;
+
+    // Direct (non-copying) view of the first `getSampleCount()` samples. Used by
+    // NatImuBulkDataSchemaDescriptor to project per-axis sample arrays without the
+    // per-access allocation `createImuRecords()` would incur.
+    const NatImuDataSchema* getSamples() const;
 
 #ifdef SERVER
     static Optional<std::shared_ptr<NatImuBulkDataSchema>> tryCreateFromSchema(const Optional<const std::shared_ptr<Schema>>& messageMaybe);
