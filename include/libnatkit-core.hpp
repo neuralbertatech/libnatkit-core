@@ -1154,19 +1154,29 @@ public:
 
 private:
   uint64_t time;
-  float data[10];
+  // 13 positional floats, NOT named:
+  //   0-2  accel x/y/z (m/s^2)      6-9   quat real/i/j/k
+  //   3-5  gyro  x/y/z (rad/s)      10-12 mag   x/y/z (uT)
+  //
+  // ⚠️ THE MAGNETOMETER (10-12) IS ONLY ON THE WIRE IN FRAME VERSION 2. A v1
+  // frame carries ten floats; decoding one leaves 10-12 zeroed and the
+  // magnetometer_has_data bit clear, which is what distinguishes "no
+  // magnetometer in this recording" from "a magnetometer reading of zero".
+  // ALWAYS CHECK has_data -- a zero field is not the same as an absent one, and
+  // every recording made before 2026-08 is v1.
+  float data[13];
   uint8_t accuracies; // 0bXX XX XX XX
-                      //   ^   ^  ^  ^
-                      //   |   |  |  L rotation_accuracy
-                      //   |   |  L gryoscope_accuracy
-                      //   |   L acceleration_accuracy
-                      //   L unused
-  uint8_t has_data;   // 0bXXXXX X X X
-                      //       ^ ^ ^ ^
-                      //       | | | L rotation_has_data
-                      //       | | L gyroscope_has_data
-                      //       | L acceleration_has_data
-                      //       L unused
+                      //   ^  ^  ^  ^
+                      //   |  |  |  L rotation_accuracy
+                      //   |  |  L gryoscope_accuracy
+                      //   |  L acceleration_accuracy
+                      //   L magnetometer_accuracy (was unused; v2)
+  uint8_t has_data;   // 0bXXXX X X X X
+                      //      ^ ^ ^ ^
+                      //      | | | L rotation_has_data
+                      //      | | L gyroscope_has_data
+                      //      | L acceleration_has_data
+                      //      L magnetometer_has_data (was unused; v2)
 
 public:
   static const std::string name;
@@ -1225,11 +1235,17 @@ public:
 
   SensorAccuracy getRotationAccuracy() const;
 
+  SensorAccuracy getMagnetometerAccuracy() const;
+
   bool wasDataSetForAcceleration() const;
 
   bool wasDataSetForGryoscope() const;
 
   bool wasDataSetForRotation() const;
+
+  // False for every frame written before version 2, which had no magnetometer
+  // field. Check this before using data[10..12].
+  bool wasDataSetForMagnetometer() const;
 
   const float* getData() const;
 
@@ -1259,6 +1275,29 @@ public:
     //   uint64 seqNo         | uint64 deviceTsUs
     static const uint16_t kFrameSchemaVersion;
     static const size_t kFrameHeaderSize;
+
+    // has_data masks per frame version. A v1 frame cannot say anything about the
+    // magnetometer, so its bit is cleared rather than trusted -- a v1 writer left
+    // that bit unused, and "unused" is not the same as "false" once something
+    // starts reading it.
+    static const uint8_t kHasDataMaskV1;
+    static const uint8_t kHasDataMaskV2;
+
+    // Same argument for the accuracy byte: v1 writers left bits 7-6 unused and
+    // some set them, so they are cleared rather than read as a magnetometer
+    // accuracy. Masking has_data alone would leave a v1 frame reporting "no
+    // magnetometer, accuracy high", which is the kind of half-true that gets
+    // quoted.
+    static const uint8_t kAccuraciesMaskV1;
+    static const uint8_t kAccuraciesMaskV2;
+
+    // How a frame of the given version is laid out on the wire. ⚠️ ADDING A
+    // VERSION MEANS RE-CHECKING THE LEGACY SENTINEL in decodeBinary: the
+    // headerless format is recognised purely by being exactly 5000 bytes, which
+    // is only unambiguous while 24 + n*sampleSize == 5000 has no integer
+    // solution for every supported sampleSize.
+    static size_t binaryFloatsPerSample(uint16_t frameVersion);
+    static size_t binarySampleSize(uint16_t frameVersion);
 
     NatImuBulkDataSchema();
 

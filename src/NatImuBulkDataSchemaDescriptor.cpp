@@ -5,7 +5,8 @@ namespace core {
 
 const std::string NatImuBulkDataSchemaDescriptor::name =
     "NatImuBulkDataSchemaDescriptor";
-const uint16_t NatImuBulkDataSchemaDescriptor::descriptorVersion = 1;
+// 2: the magnetometer channels were added.
+const uint16_t NatImuBulkDataSchemaDescriptor::descriptorVersion = 2;
 
 namespace {
 
@@ -60,11 +61,20 @@ SchemaFieldDescriptor buildNatImuBulkRootField() {
           buildImuAxisArrayField("gyro_x", "Gyro X", "rad/s"),
           buildImuAxisArrayField("gyro_y", "Gyro Y", "rad/s"),
           buildImuAxisArrayField("gyro_z", "Gyro Z", "rad/s"),
+          buildImuAxisArrayField("mag_x", "Mag X", "uT"),
+          buildImuAxisArrayField("mag_y", "Mag Y", "uT"),
+          buildImuAxisArrayField("mag_z", "Mag Z", "uT"),
       });
+  // ⚠️ THE QUATERNION (floats 6-9) IS STILL NOT EXPOSED HERE, and that is
+  // pre-existing rather than an oversight of the magnetometer work. It means
+  // Parquet export and the transform pipeline see accel, gyro and now mag but
+  // no orientation. Worth fixing, but it is a separate decision -- a quaternion
+  // is four channels that are only meaningful together, unlike these triples.
 }
 
-// Flattened index into NatImuDataSchema::getData() (accel 0-2, gyro 3-5) for each
-// channel field id; -1 if the field is not a per-axis array.
+// Flattened index into NatImuDataSchema::getData() for each channel field id;
+// -1 if the field is not a per-axis array. Layout: accel 0-2, gyro 3-5,
+// quat 6-9 (not exposed), mag 10-12.
 int axisIndexForField(const std::string &fieldId) {
   if (fieldId == "accel_x") return 0;
   if (fieldId == "accel_y") return 1;
@@ -72,6 +82,9 @@ int axisIndexForField(const std::string &fieldId) {
   if (fieldId == "gyro_x") return 3;
   if (fieldId == "gyro_y") return 4;
   if (fieldId == "gyro_z") return 5;
+  if (fieldId == "mag_x") return 10;
+  if (fieldId == "mag_y") return 11;
+  if (fieldId == "mag_z") return 12;
   return -1;
 }
 

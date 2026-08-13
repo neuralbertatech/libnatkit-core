@@ -4,7 +4,8 @@ namespace nat {
 namespace core {
 
 const std::string NatImuDataSchemaDescriptor::name = "NatImuDataSchemaDescriptor";
-const uint16_t NatImuDataSchemaDescriptor::descriptorVersion = 1;
+// 2: the magnetometer group was added.
+const uint16_t NatImuDataSchemaDescriptor::descriptorVersion = 2;
 
 namespace {
 
@@ -61,6 +62,19 @@ SchemaFieldDescriptor buildNatImuRootField() {
                   SchemaFieldDescriptor("k", "K", FieldValueType::Float32),
               }),
           SchemaFieldDescriptor(
+              "mag",
+              "Magnetometer",
+              FieldValueType::Object,
+              "Magnetic field vector",
+              "uT",
+              false,
+              {},
+              {
+                  SchemaFieldDescriptor("x", "X", FieldValueType::Float32),
+                  SchemaFieldDescriptor("y", "Y", FieldValueType::Float32),
+                  SchemaFieldDescriptor("z", "Z", FieldValueType::Float32),
+              }),
+          SchemaFieldDescriptor(
               "accuracies",
               "Accuracies",
               FieldValueType::Object,
@@ -84,6 +98,11 @@ SchemaFieldDescriptor buildNatImuRootField() {
                       "Rotation",
                       FieldValueType::Uint32,
                       "Rotation accuracy enum"),
+                  SchemaFieldDescriptor(
+                      "magnetometer",
+                      "Magnetometer",
+                      FieldValueType::Uint32,
+                      "Magnetometer accuracy enum"),
               }),
           SchemaFieldDescriptor(
               "has_data",
@@ -99,6 +118,12 @@ SchemaFieldDescriptor buildNatImuRootField() {
                   SchemaFieldDescriptor(
                       "gyroscope", "Gyroscope", FieldValueType::Bool),
                   SchemaFieldDescriptor("rotation", "Rotation", FieldValueType::Bool),
+                  // ⚠️ FALSE ON EVERY RECORDING MADE BEFORE FRAME VERSION 2, which
+                  // is every recording before 2026-08. A v1 frame had no
+                  // magnetometer field at all, so this reports "absent" rather
+                  // than inventing a zero reading.
+                  SchemaFieldDescriptor(
+                      "magnetometer", "Magnetometer", FieldValueType::Bool),
               })});
 }
 
@@ -113,6 +138,8 @@ Optional<FieldValueRef> getImuVectorValue(
     baseIndex = 3;
   } else if (groupName == "quat") {
     baseIndex = 6;
+  } else if (groupName == "mag") {
+    baseIndex = 10;
   } else {
     return {};
   }
@@ -191,7 +218,7 @@ Optional<FieldValueRef> NatImuDataSchemaDescriptor::tryGetFieldValue(
 
   const float *data = imuRecord->getData();
   if (segments[0].fieldId == "accel" || segments[0].fieldId == "gyro" ||
-      segments[0].fieldId == "quat") {
+      segments[0].fieldId == "quat" || segments[0].fieldId == "mag") {
     if (segments.size() != 2) {
       return {};
     }
@@ -215,6 +242,10 @@ Optional<FieldValueRef> NatImuDataSchemaDescriptor::tryGetFieldValue(
       return FieldValueRef::fromUint32(
           static_cast<uint32_t>(imuRecord->getRotationAccuracy()));
     }
+    if (segments[1].fieldId == "magnetometer") {
+      return FieldValueRef::fromUint32(
+          static_cast<uint32_t>(imuRecord->getMagnetometerAccuracy()));
+    }
   }
 
   if (segments[0].fieldId == "has_data") {
@@ -226,6 +257,9 @@ Optional<FieldValueRef> NatImuDataSchemaDescriptor::tryGetFieldValue(
     }
     if (segments[1].fieldId == "rotation") {
       return FieldValueRef::fromBool(imuRecord->wasDataSetForRotation());
+    }
+    if (segments[1].fieldId == "magnetometer") {
+      return FieldValueRef::fromBool(imuRecord->wasDataSetForMagnetometer());
     }
   }
 

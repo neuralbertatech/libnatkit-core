@@ -116,6 +116,10 @@ if(LIBNATKIT_CORE_BUILD_TESTS)
   target_compile_definitions(stream_id_abi_test PRIVATE
     NAT_GOLDEN_FIXTURE_PATH="${LIBNATKIT_CORE_ROOT}/tests/stream_id_golden.json")
   add_test(NAME stream_id_abi_test COMMAND stream_id_abi_test)
+
+  add_executable(imu_frame_version_test "${LIBNATKIT_CORE_ROOT}/tests/imu_frame_version_test.cpp")
+  target_link_libraries(imu_frame_version_test PRIVATE libnatkit-core nlohmann)
+  add_test(NAME imu_frame_version_test COMMAND imu_frame_version_test)
 endif()
 
 else()

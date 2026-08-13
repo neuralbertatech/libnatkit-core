@@ -12,7 +12,7 @@ namespace nat {
 namespace core {
 
 const std::string NatImuDataSchema::name = "NatImuDataSchema";
-const uint32_t NatImuDataSchema::NatImuDataSchemaDataArraySize = 10;
+const uint32_t NatImuDataSchema::NatImuDataSchemaDataArraySize = 13;
 
 NatImuDataSchema::NatImuDataSchema()
     : time(0), accuracies(0), has_data(0) {
@@ -273,21 +273,17 @@ Optional<std::unique_ptr<NatImuDataSchema>> NatImuDataSchema::decodeCsv(const st
             has_data = std::stoi(currentValue);
             break;
 
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 10:
-        case 11:
-        case 12:
-            data[i - 3] = std::stof(currentValue);
-            break;
-
+        // ⚠️ A RANGE, NOT A CASE PER FLOAT. This was ten hand-written case
+        // labels, so widening the record from 10 floats to 13 would have walked
+        // straight into the default and asserted -- silently, only on the CSV
+        // path, which nothing exercises often.
         default:
-            assert(0);
+            if (i >= 3 && i < static_cast<int>(3 + NatImuDataSchemaDataArraySize)) {
+                data[i - 3] = std::stof(currentValue);
+            } else {
+                assert(0);
+            }
+            break;
         }
         currentValue = "";
     }
@@ -360,6 +356,11 @@ NatImuDataSchema::SensorAccuracy NatImuDataSchema::getRotationAccuracy() const{
   return convertIntToSensorAccuracy(this->accuracies & 3);
 }
 
+NatImuDataSchema::SensorAccuracy NatImuDataSchema::getMagnetometerAccuracy() const{
+  // Bits 7-6, which were the unused pair before frame version 2.
+  return convertIntToSensorAccuracy((this->accuracies >> 6) & 3);
+}
+
 bool NatImuDataSchema::wasDataSetForAcceleration() const {
   return static_cast<bool>((this->has_data >> 2) & 1);
 }
@@ -370,6 +371,13 @@ bool NatImuDataSchema::wasDataSetForGryoscope() const {
 
 bool NatImuDataSchema::wasDataSetForRotation() const {
   return static_cast<bool>(this->has_data & 1);
+}
+
+bool NatImuDataSchema::wasDataSetForMagnetometer() const {
+  // Bit 3, unused before frame version 2. decodeBinary masks it off for v1
+  // frames, so a false here means "this recording has no magnetometer" rather
+  // than "the magnetometer had nothing to say".
+  return static_cast<bool>((this->has_data >> 3) & 1);
 }
 
 const float* NatImuDataSchema::getData() const {

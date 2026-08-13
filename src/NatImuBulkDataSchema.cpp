@@ -12,8 +12,27 @@ namespace nat {
     namespace core {
 
         const std::string NatImuBulkDataSchema::name = "NatImuBulkDataSchema";
-        const uint16_t NatImuBulkDataSchema::kFrameSchemaVersion = 1;
+        // ⚠️ VERSION 2 ADDS THE MAGNETOMETER. Everything recorded before 2026-08 is
+        // version 1 and decodes through the v1 branch below; nothing needs migrating.
+        const uint16_t NatImuBulkDataSchema::kFrameSchemaVersion = 2;
         const size_t NatImuBulkDataSchema::kFrameHeaderSize = 24;
+
+        const uint8_t NatImuBulkDataSchema::kHasDataMaskV1 = 0x07;  // accel | gyro | rotation
+        const uint8_t NatImuBulkDataSchema::kHasDataMaskV2 = 0x0F;  // ... | magnetometer
+
+        const uint8_t NatImuBulkDataSchema::kAccuraciesMaskV1 = 0x3F;  // bits 5-0
+        const uint8_t NatImuBulkDataSchema::kAccuraciesMaskV2 = 0xFF;  // ... + bits 7-6
+
+        size_t NatImuBulkDataSchema::binaryFloatsPerSample(const uint16_t frameVersion) {
+            // v1: accel(3) + gyro(3) + quat(4).  v2: ... + mag(3).
+            return frameVersion >= 2 ? 13 : 10;
+        }
+
+        size_t NatImuBulkDataSchema::binarySampleSize(const uint16_t frameVersion) {
+            // uint64 time + N float32 + uint8 accuracies + uint8 has_data.
+            //   v1 -> 8 + 40 + 2 = 50 bytes,  v2 -> 8 + 52 + 2 = 62 bytes.
+            return sizeof(uint64_t) + binaryFloatsPerSample(frameVersion) * sizeof(float) + 2;
+        }
         static const int NatImuBulkDataSchemaDataArraySize = 100;
 
         NatImuBulkDataSchema::NatImuBulkDataSchema()
@@ -185,14 +204,20 @@ namespace nat {
             }
 
             case SerializationType::Binary: {
-                const int singleReadingSizeInBytes = 50;
+                // Written at the CURRENT version, which carries the magnetometer.
+                const size_t floatsPerSample = binaryFloatsPerSample(kFrameSchemaVersion);
+                const size_t singleReadingSizeInBytes = binarySampleSize(kFrameSchemaVersion);
                 const uint16_t sampleCount = static_cast<uint16_t>(size);
                 const size_t totalSize = kFrameHeaderSize + static_cast<size_t>(singleReadingSizeInBytes) * sampleCount;
                 auto bytes = nat::core::make_unique<std::vector<uint8_t>>(totalSize, 0);
                 char* dataPointer = (char*)bytes->data();
 
                 // Frame header (24 bytes, little-endian).
-                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint16_t>(dataPointer, schemaVersion);
+                // ⚠️ kFrameSchemaVersion, NOT the member. The member holds the version
+                // a frame was DECODED from, so echoing it here would re-emit a v1
+                // header in front of a v2-sized body after any decode/encode round
+                // trip -- a length mismatch at the far end with nothing to point at.
+                dataPointer += Binary::unsafeWriteAsBinaryToArray<uint16_t>(dataPointer, kFrameSchemaVersion);
                 dataPointer += Binary::unsafeWriteAsBinaryToArray<uint16_t>(dataPointer, sampleCount);
                 dataPointer += Binary::unsafeWriteAsBinaryToArray<uint32_t>(dataPointer, sampleRateHz);
                 dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, seqNo);
@@ -200,7 +225,7 @@ namespace nat {
 
                 for (size_t i = 0; i < sampleCount; ++i) {
                     dataPointer += Binary::unsafeWriteAsBinaryToArray<uint64_t>(dataPointer, data[i].time);
-                    for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
+                    for (size_t j = 0; j < floatsPerSample; ++j) {
                         // Use memcpy to preserve float bit pattern (not value conversion)
                         memcpy(dataPointer, &data[i].data[j], sizeof(float));
                         dataPointer += sizeof(float);
@@ -263,32 +288,45 @@ namespace nat {
 //        }
 
         Optional<std::unique_ptr<NatImuBulkDataSchema>> NatImuBulkDataSchema::decodeBinary(const std::vector<uint8_t>& message) {
-            const int singleReadingSizeInBytes = 50;
-            const size_t legacySize = static_cast<size_t>(singleReadingSizeInBytes) * NatImuBulkDataSchemaDataArraySize; // 5000
+            // ⚠️ THE SAMPLE SIZE DEPENDS ON THE FRAME VERSION, so it cannot be read
+            // until the header has been. v1 samples are 50 bytes (10 floats), v2 are
+            // 62 (13, adding the magnetometer). This used to be one hard-coded 50 in
+            // this function and another in the encoder.
+            const size_t legacySize = static_cast<size_t>(binarySampleSize(1)) * NatImuBulkDataSchemaDataArraySize; // 5000
 
             auto schema = nat::core::make_unique<NatImuBulkDataSchema>();
 
             // Reads one fixed-size sample from `bytes`, advancing the pointer.
-            const auto readSample = [&](char*& bytes) {
+            // Floats the frame does not carry are left at zero and their has_data
+            // bit is cleared by the caller's mask.
+            const auto readSample = [&](char*& bytes, size_t floatsPerSample, uint8_t hasDataMask,
+                                        uint8_t accuraciesMask) {
                 NatImuDataSchema sensorReading{};
                 bytes += Binary::unsafeParseFromBinary(bytes, sensorReading.time);
-                for (size_t j = 0; j < NatImuDataSchema::NatImuDataSchemaDataArraySize; ++j) {
+                for (size_t j = 0; j < floatsPerSample; ++j) {
                     // Use memcpy to read float bit pattern directly
                     memcpy(&sensorReading.data[j], bytes, sizeof(float));
                     bytes += sizeof(float);
                 }
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.accuracies);
                 bytes += Binary::unsafeParseFromBinary<uint8_t>(bytes, *(uint8_t*)&sensorReading.has_data);
+                sensorReading.has_data &= hasDataMask;
+                sensorReading.accuracies &= accuraciesMask;
                 schema->add(sensorReading);
             };
 
-            // Legacy headerless format: exactly 100 samples, no frame envelope.
-            // (A framed message is never exactly 5000 bytes: 24 + n*50 == 5000
-            // has no integer solution, so this sentinel is unambiguous.)
+            // Legacy headerless format: exactly 100 samples, no frame envelope, and
+            // always v1-shaped.
+            //
+            // ⚠️ THE SENTINEL STILL HAS TO BE UNAMBIGUOUS AT EVERY VERSION, and that
+            // is now two claims rather than one: 24 + n*50 == 5000 has no integer
+            // solution, and neither does 24 + n*62 == 5000 (4976/62 = 80.26). Adding
+            // a version 3 means re-checking this, so binarySampleSize() carries the
+            // same warning.
             if (message.size() == legacySize) {
                 char* bytes = (char*)message.data();
                 for (int i = 0; i < NatImuBulkDataSchemaDataArraySize; ++i)
-                    readSample(bytes);
+                    readSample(bytes, binaryFloatsPerSample(1), kHasDataMaskV1, kAccuraciesMaskV1);
                 return std::move(schema);
             }
 
@@ -315,15 +353,29 @@ namespace nat {
                           << " exceeds capacity " << NatImuBulkDataSchemaDataArraySize << ".\n";
                 return {};
             }
-            const size_t expectedSize = kFrameHeaderSize + static_cast<size_t>(singleReadingSizeInBytes) * sampleCount;
+            if (decodedSchemaVersion == 0 || decodedSchemaVersion > kFrameSchemaVersion) {
+                std::cerr << "NatImuBulkDataSchema::decodeBinary: unsupported frame version "
+                          << decodedSchemaVersion << " (this build understands 1.."
+                          << kFrameSchemaVersion << "). A newer writer is on the wire.\n";
+                return {};
+            }
+            const size_t floatsPerSample = binaryFloatsPerSample(decodedSchemaVersion);
+            const size_t singleReadingSizeInBytes = binarySampleSize(decodedSchemaVersion);
+            const uint8_t hasDataMask =
+                decodedSchemaVersion >= 2 ? kHasDataMaskV2 : kHasDataMaskV1;
+            const uint8_t accuraciesMask =
+                decodedSchemaVersion >= 2 ? kAccuraciesMaskV2 : kAccuraciesMaskV1;
+
+            const size_t expectedSize = kFrameHeaderSize + singleReadingSizeInBytes * sampleCount;
             if (message.size() != expectedSize) {
                 std::cerr << "NatImuBulkDataSchema::decodeBinary: framed message size mismatch. Expected "
-                          << expectedSize << " bytes, got " << message.size() << " bytes.\n";
+                          << expectedSize << " bytes for a version " << decodedSchemaVersion
+                          << " frame of " << sampleCount << " samples, got " << message.size() << " bytes.\n";
                 return {};
             }
 
             for (int i = 0; i < sampleCount; ++i)
-                readSample(bytes);
+                readSample(bytes, floatsPerSample, hasDataMask, accuraciesMask);
             schema->setFrameHeader(decodedSeqNo, decodedDeviceTsUs, decodedSampleRateHz);
             schema->schemaVersion = decodedSchemaVersion;
             return std::move(schema);
