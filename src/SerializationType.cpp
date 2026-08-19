@@ -10,6 +10,11 @@ SerializationType getSerializationType(const std::string& encoderName) {
   if (lowercaseEncoderName == "json") {
     return SerializationType::Json;
   }
+  else if (lowercaseEncoderName == "csv") {
+      return SerializationType::Csv;
+  } else if (lowercaseEncoderName == "binary") {
+    return SerializationType::Binary;
+  }
 
   std::cout << "Fatal Error: Invalid serialization type '" << encoderName << "'" << std::endl;
   assert(0);
@@ -19,6 +24,10 @@ std::string toString(const SerializationType& serializationType) {
   switch (serializationType) {
     case SerializationType::Json:
       return serializationTypeToStringMapping.at(SerializationType::Json);
+    case SerializationType::Csv:
+        return serializationTypeToStringMapping.at(SerializationType::Csv);
+    case SerializationType::Binary:
+      return serializationTypeToStringMapping.at(SerializationType::Binary);
     default:
       assert(0);
   }

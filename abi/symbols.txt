@@ -1,0 +1,21 @@
+# Exported C ABI symbols of libnatkit-core (append-only baseline).
+#
+# One symbol per line; lines starting with '#' and blank lines are ignored.
+# scripts/check_abi_symbols.sh fails if any symbol listed here is MISSING from
+# the built shared library -- a removed or renamed exported symbol is a breaking
+# ABI change and must instead ship as a new _vN_ symbol alongside the old one.
+# New symbols may be added freely (append-only); add them here in the same
+# commit that introduces them.
+nat_assign_intervals_to_timeline
+nat_assign_points_to_timeline
+nat_core_v1_emg_frame_decode_json
+nat_core_v1_emg_frame_encode_json
+nat_core_v1_marker_event_decode_json
+nat_core_v1_marker_event_encode_json
+nat_core_v1_stream_id
+nat_core_v1_topic_build
+nat_core_v1_topic_parse
+nat_free_bytes
+nat_session_metadata_record_decode_json
+nat_session_metadata_record_encode_json
+nat_sort_timestamps

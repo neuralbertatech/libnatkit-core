@@ -10,6 +10,8 @@ std::string toString(const StreamType &streamType) {
     return streamTypeToStringMapping.at(StreamType::DATA);
   case StreamType::META:
     return streamTypeToStringMapping.at(StreamType::META);
+  case StreamType::MARKER:
+    return streamTypeToStringMapping.at(StreamType::MARKER);
   case StreamType::EXECUTION_COMMAND:
     return streamTypeToStringMapping.at(StreamType::EXECUTION_COMMAND);
   case StreamType::HARDWARE_STATUS:

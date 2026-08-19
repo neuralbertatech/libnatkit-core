@@ -1,4 +1,5 @@
 #include <libnatkit-core.hpp>
+#include <iostream>
 
 namespace nat {
 namespace core {
@@ -18,21 +19,34 @@ namespace core {
 std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   auto registry = nat::core::make_unique<Registry>();
   BasicMetaInfoSchema::registerWithRegistry(*registry);
+  MetaRecord::registerWithRegistry(*registry);
+  SessionMetadataRecord::registerWithRegistry(*registry);
+  TransformProvenanceRecord::registerWithRegistry(*registry);
+  MarkerEventV1::registerWithRegistry(*registry);
+  ExgPillEmgDataSchemaV1::registerWithRegistry(*registry);
+  ExgPillEmgTransformDataSchemaV1::registerWithRegistry(*registry);
+  NatSignalFrameDataSchemaV1::registerWithRegistry(*registry);
+  NatImuDataSchema::registerWithRegistry(*registry);
+  NatImuBulkDataSchema::registerWithRegistry(*registry);
+  NatMuseDataSchema::registerWithRegistry(*registry);
+  NatMuseBulkDataSchema::registerWithRegistry(*registry);
 
   return registry;
 }
 
     void Registry::registerEncoder(const std::string& schemaName, const SerializationType& type, const std::shared_ptr<Encoder>& encoder) {
       const auto key = createKey(schemaName, type);
+      std::cout << "Registering encoder \"" << key << "\"\n";
       const auto search = encoders.find(key);
-      if (search != encoders.end())
+      if (search == encoders.end())
         encoders.emplace(key, encoder);
     }
 
     void Registry::registerDecoder(const std::string& schemaName, const SerializationType& type, const decoder_t& decoder) {
       const auto key = createKey(schemaName, type);
+      std::cout << "Registering decoder \"" << key << "\"\n";
       const auto search = decoders.find(key);
-      if (search != decoders.end())
+      if (search == decoders.end())
         decoders.emplace(key, decoder);
     }
 
@@ -52,6 +66,7 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
      if (results != decoders.end()) {
        return results->second(message, topicInfo.serializationType);
      } else {
+         std::cout << "Could not decode the key \"" << key << "\"!\n";
         return {};
      }
     }

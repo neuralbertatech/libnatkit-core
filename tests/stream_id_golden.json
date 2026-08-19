@@ -1,0 +1,108 @@
+{
+  "description": "Golden vectors for the libnatkit-core stream identity ABI. stream_id = FNV-1a over '<namespace>:<identifier>' (UTF-8 bytes) masked to 63 bits with 0->1. topic_vectors use ASCII identifiers because topic_build enforces the ^[A-Za-z0-9][A-Za-z0-9_-]*$ segment grammar. Checked in once; read verbatim by both the C++ test binary and the Python ctypes test. Do NOT regenerate per test run.",
+  "stream_id_vectors": [
+    {
+      "namespace": "device_id",
+      "identifier": "emg01",
+      "stream_id": 1112596048936639351
+    },
+    {
+      "namespace": "device_id",
+      "identifier": "muse-2A",
+      "stream_id": 4666338488939662079
+    },
+    {
+      "namespace": "session_id",
+      "identifier": "sess-123",
+      "stream_id": 1447991540344185286
+    },
+    {
+      "namespace": "session_id",
+      "identifier": "20260707_run01",
+      "stream_id": 6486970083265102374
+    },
+    {
+      "namespace": "status_device_id",
+      "identifier": "emg01",
+      "stream_id": 7618789764172642976
+    },
+    {
+      "namespace": "session_id",
+      "identifier": "séance-café",
+      "stream_id": 5249010196962764578
+    },
+    {
+      "namespace": "session_id",
+      "identifier": "参加者01",
+      "stream_id": 2692478189529135146
+    },
+    {
+      "namespace": "device_id",
+      "identifier": "naïve_dev",
+      "stream_id": 9175402911056603783
+    },
+    {
+      "namespace": "n",
+      "identifier": "x",
+      "stream_id": 2446519032930669643
+    }
+  ],
+  "topic_vectors": [
+    {
+      "stream_type": "Data",
+      "namespace": "device_id",
+      "identifier": "emg01",
+      "serialization": "Json",
+      "schema_name": "ExgPillEmgDataSchemaV1",
+      "topic": "Data-1112596048936639351-Json-ExgPillEmgDataSchemaV1"
+    },
+    {
+      "stream_type": "Data",
+      "namespace": "device_id",
+      "identifier": "muse-2A",
+      "serialization": "Json",
+      "schema_name": "NatImuDataSchema",
+      "topic": "Data-4666338488939662079-Json-NatImuDataSchema"
+    },
+    {
+      "stream_type": "Data",
+      "namespace": "session_id",
+      "identifier": "sess-123",
+      "serialization": "Json",
+      "schema_name": "HandStateV1",
+      "topic": "Data-1447991540344185286-Json-HandStateV1"
+    },
+    {
+      "stream_type": "Marker",
+      "namespace": "session_id",
+      "identifier": "sess-123",
+      "serialization": "Json",
+      "schema_name": "MarkerEventV1",
+      "topic": "Marker-1447991540344185286-Json-MarkerEventV1"
+    },
+    {
+      "stream_type": "Meta",
+      "namespace": "session_id",
+      "identifier": "sess-123",
+      "serialization": "Json",
+      "schema_name": "MetaRecord",
+      "topic": "Meta-1447991540344185286-Json-MetaRecord"
+    },
+    {
+      "stream_type": "Status",
+      "namespace": "device_id",
+      "identifier": "emg01",
+      "serialization": "Json",
+      "schema_name": "DeviceStatusV1",
+      "topic": "Status-1112596048936639351-Json-DeviceStatusV1"
+    },
+    {
+      "stream_type": "Heartbeat",
+      "namespace": "status_device_id",
+      "identifier": "emg01",
+      "serialization": "Json",
+      "schema_name": "DeviceFirmwareStatusV1",
+      "topic": "Heartbeat-7618789764172642976-Json-DeviceFirmwareStatusV1"
+    }
+  ]
+}
