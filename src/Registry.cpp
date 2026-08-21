@@ -30,6 +30,8 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   NatImuBulkDataSchema::registerWithRegistry(*registry);
   NatMuseDataSchema::registerWithRegistry(*registry);
   NatMuseBulkDataSchema::registerWithRegistry(*registry);
+  NatKitNodeStatusV1Schema::registerWithRegistry(*registry);
+  NatKitPrimaryStatusV1Schema::registerWithRegistry(*registry);
 
   return registry;
 }

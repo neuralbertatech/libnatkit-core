@@ -1199,6 +1199,11 @@ public:
 
   // Round-trippable on purpose: an encoder that cannot reproduce the bytes it
   // decoded is not a shared definition, it is a second guess.
+  // Registered so the GENERIC decode path can read these: a log viewer resolves
+  // a topic through the Registry rather than knowing schema names, so a schema
+  // that is only decodable by calling decodeBinary() directly is invisible to it.
+  static void registerWithRegistry(Registry &registry);
+
   static Optional<NatKitNodeStatusV1Schema> decodeBinary(
       const std::vector<uint8_t>& message);
   std::vector<uint8_t> encodeBinary() const;
@@ -1281,6 +1286,11 @@ public:
   Optional<std::shared_ptr<Schema>> tryDecode(
       const std::vector<uint8_t>& message,
       const SerializationType& type) const override;
+
+  // Registered so the GENERIC decode path can read these: a log viewer resolves
+  // a topic through the Registry rather than knowing schema names, so a schema
+  // that is only decodable by calling decodeBinary() directly is invisible to it.
+  static void registerWithRegistry(Registry &registry);
 
   static Optional<NatKitPrimaryStatusV1Schema> decodeBinary(
       const std::vector<uint8_t>& message);

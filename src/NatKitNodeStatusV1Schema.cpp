@@ -303,5 +303,21 @@ Optional<std::shared_ptr<Schema>> NatKitNodeStatusV1Schema::tryDecode(
       std::make_shared<NatKitNodeStatusV1Schema>(decoded.value()));
 }
 
+void NatKitNodeStatusV1Schema::registerWithRegistry(Registry &registry) {
+    const decoder_t decoder = [](const message_t &message,
+                                 const SerializationType &type) {
+        if (type != SerializationType::Binary) {
+            return Optional<std::unique_ptr<Schema>>{};
+        }
+        auto decoded = decodeBinary(message);
+        if (!decoded.has_value()) {
+            return Optional<std::unique_ptr<Schema>>{};
+        }
+        std::unique_ptr<Schema> converted(new NatKitNodeStatusV1Schema(decoded.value()));
+        return Optional<std::unique_ptr<Schema>>{std::move(converted)};
+    };
+    registry.registerDecoder(name, SerializationType::Binary, decoder);
+}
+
 }  // namespace core
 }  // namespace nat
