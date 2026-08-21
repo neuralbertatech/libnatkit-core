@@ -1106,6 +1106,203 @@ public:
   static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
 };
 
+// --- Device health: NatKitNodeStatusV1 (TEC-NATKIT-33) --------------------
+//
+// The per-leaf health the primary publishes on `Log-<id>-Binary-NatKitNodeStatusV1`
+// at ~1 Hz: what a leaf built, sent and failed to send, its sequence gaps, its
+// RSSI, and the clock fit the primary holds for it.
+//
+// ⚠️ THIS EXISTS SO THE LAYOUT STOPS LIVING IN THREE PLACES. Before it, the only
+// definitions were the firmware's `UplinkNodeStatus` struct and a hardcoded
+// `struct.unpack` in ~/natkit-verification (not in git), which has already failed
+// silently in the predictable way: a sibling script pinned NODE_SIZE = 168 and
+// skipped every frame of any other size, so a struct that grew a field produced
+// empty windows that read as a dead rig.
+//
+// ⚠️ Decoded FIELD BY FIELD in explicit little-endian, never by memcpy onto a
+// struct. The wire bytes are a memcpy of the firmware's struct on an xtensa
+// build; reproducing that by declaring a matching struct here would make the
+// decode depend on this compiler agreeing about padding, which is the failure
+// nobody notices until a different target is used. The explicit offsets are
+// asserted against a captured live frame in the tests.
+class NatKitNodeStatusV1Schema : public Schema, public Decoder {
+public:
+  static const std::string name;
+  // The published payload is exactly this size; anything else is refused rather
+  // than decoded partially.
+  static const size_t kWireSize;
+
+  uint64_t deviceId = 0;
+  uint8_t mac[6] = {};
+  // ⚠️ The formatted MAC is STORED, not formatted on demand, because
+  // FieldValueRef is a reference type: it keeps a `const void*` to the caller's
+  // string. Returning fromString() on a temporary compiles, resolves, and hands
+  // back an empty value from a dangling pointer -- which is what it did until a
+  // test printed it.
+  std::string macText;
+  int8_t leafNoiseFloorDbm = 0;
+
+  uint32_t dataFrames = 0;
+  uint32_t seqGaps = 0;
+  uint32_t seqDuplicates = 0;
+  uint32_t seqRestarts = 0;
+  uint32_t heartbeats = 0;
+  uint64_t lastSeenUs = 0;      // in the PRIMARY's clock
+
+  // The leaf's clock fit, as the primary holds it.
+  uint64_t syncDeviceId = 0;
+  uint32_t syncEpoch = 0;
+  uint64_t syncRefLocalUs = 0;
+  int64_t syncRefOffsetUs = 0;
+  int32_t syncSkewPpb = 0;
+  uint32_t syncResidualRmsNs = 0;
+  uint32_t syncPeakResidualNs = 0;
+  uint64_t syncLastBeaconLocalUs = 0;
+  uint32_t beaconsSeen = 0;
+  uint32_t beaconsMissed = 0;
+  uint32_t pairsUsed = 0;
+  uint32_t pairsOrphaned = 0;
+  uint32_t outliersRejected = 0;
+  uint32_t epochChanges = 0;
+  uint32_t macSpreadUs = 0;
+  uint16_t samplesUsed = 0;
+  uint8_t quality = 0;
+  uint8_t implausibleResiduals = 0;
+
+  uint8_t syncValid = 0;
+  int8_t rssiLast = 0;
+  int8_t rssiBest = 0;
+  int8_t rssiWorst = 0;
+  uint8_t rssiSeen = 0;
+  uint8_t leafScanChannel = 0;
+  int8_t leafRssiOfPrimary = 0;
+  uint8_t leafTxPowerQuarterDbm = 0;
+
+  uint32_t leafFramesBuilt = 0;
+  uint32_t leafFramesDropped = 0;
+  uint32_t leafSendFailures = 0;
+  uint32_t leafChannelHops = 0;
+  uint32_t publishNoSync = 0;
+  uint32_t publishNoShift = 0;
+
+  NatKitNodeStatusV1Schema() = default;
+
+  bool isSerializationTypeSupported(const SerializationType) const override;
+  std::unique_ptr<message_t> encodeToBytes(const SerializationType& type) const override;
+  std::string getName() const override;
+  std::string toString() const override;
+  uint64_t getTimestampUs() const override;
+
+  Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t>& message,
+      const SerializationType& type) const override;
+
+  // Round-trippable on purpose: an encoder that cannot reproduce the bytes it
+  // decoded is not a shared definition, it is a second guess.
+  static Optional<NatKitNodeStatusV1Schema> decodeBinary(
+      const std::vector<uint8_t>& message);
+  std::vector<uint8_t> encodeBinary() const;
+  std::string toJson() const;
+};
+
+class NatKitNodeStatusV1Descriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
+// --- Device health: NatKitPrimaryStatusV1 (TEC-NATKIT-33) -----------------
+//
+// The hub's own health, published on `Log-<id>-Binary-NatKitPrimaryStatusV1` at
+// ~1 Hz: uplink counters, the rig-wide time-coherence metric, the hub's noise
+// floor and die temperature, and the command-relay counters.
+//
+// Same reasoning as NatKitNodeStatusV1: decoded field by field in explicit
+// little-endian, offsets pinned by a test against a captured live frame.
+class NatKitPrimaryStatusV1Schema : public Schema, public Decoder {
+public:
+  static const std::string name;
+  static const size_t kWireSize;
+
+  uint64_t deviceId = 0;
+  uint64_t uptimeUs = 0;
+  uint32_t epoch = 0;
+  uint32_t freeHeap = 0;
+  uint32_t minFreeHeap = 0;
+  uint32_t nodesKnown = 0;
+  uint32_t nodesRejected = 0;
+  uint32_t unknownPackets = 0;
+  uint32_t framesQueued = 0;
+  uint32_t framesSent = 0;
+  uint32_t framesDropped = 0;
+  uint32_t writeTimeouts = 0;
+  uint64_t bytesSent = 0;
+  uint32_t coherenceTypicalUs = 0;
+  uint32_t coherenceBoundUs = 0;
+  uint32_t coherenceWorstUs = 0;
+  uint32_t coherenceSamples = 0;
+  uint8_t coherenceQuality = 0;
+  uint8_t coherenceMeasured = 0;
+  uint8_t registrySealed = 0;
+  int8_t noiseFloorDbm = 0;
+  int8_t chipTempC = 0;
+  uint8_t chipTempErr = 0;
+  uint32_t commandsReceived = 0;
+  uint32_t commandsRelayed = 0;
+  uint32_t commandsMalformed = 0;
+  uint32_t commandsUnknownDevice = 0;
+  uint32_t commandsSendFailed = 0;
+  uint32_t commandSubscriptions = 0;
+  uint32_t commandAnswersReceived = 0;
+  uint32_t commandAnswersPublished = 0;
+  uint32_t commandAnswersDuplicate = 0;
+  uint32_t commandsDelivered = 0;
+  uint32_t commandRetransmits = 0;
+  uint32_t commandsUndelivered = 0;
+  uint32_t resetReason = 0;
+
+  NatKitPrimaryStatusV1Schema() = default;
+
+  bool isSerializationTypeSupported(const SerializationType) const override;
+  std::unique_ptr<message_t> encodeToBytes(const SerializationType& type) const override;
+  std::string getName() const override;
+  std::string toString() const override;
+  uint64_t getTimestampUs() const override;
+
+  Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t>& message,
+      const SerializationType& type) const override;
+
+  static Optional<NatKitPrimaryStatusV1Schema> decodeBinary(
+      const std::vector<uint8_t>& message);
+  std::vector<uint8_t> encodeBinary() const;
+  std::string toJson() const;
+};
+
+class NatKitPrimaryStatusV1Descriptor : public DataSchemaDescriptor {
+public:
+  static const std::string name;
+  static const uint16_t descriptorVersion;
+
+  virtual std::string getTargetSchemaName() const override;
+  virtual uint16_t getDescriptorVersion() const override;
+  virtual const SchemaFieldDescriptor &getRootField() const override;
+  virtual Optional<FieldValueRef> tryGetFieldValue(
+      const Schema &record,
+      const std::string &path) const override;
+
+  static void registerWithRegistry(DataSchemaDescriptorRegistry &registry);
+};
+
 class NatMuseDataSchemaDescriptor : public DataSchemaDescriptor {
 public:
   static const std::string name;

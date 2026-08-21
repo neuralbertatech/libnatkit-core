@@ -48,6 +48,10 @@ set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuDataSchemaDescriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuBulkDataSchema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatKitNodeStatusV1Schema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatKitNodeStatusV1Descriptor.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatKitPrimaryStatusV1Schema.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatKitPrimaryStatusV1Descriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatImuBulkDataSchemaDescriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatMuseDataSchema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/NatMuseDataSchemaDescriptor.cpp"
@@ -120,6 +124,12 @@ if(LIBNATKIT_CORE_BUILD_TESTS)
   add_executable(imu_frame_version_test "${LIBNATKIT_CORE_ROOT}/tests/imu_frame_version_test.cpp")
   target_link_libraries(imu_frame_version_test PRIVATE libnatkit-core nlohmann)
   add_test(NAME imu_frame_version_test COMMAND imu_frame_version_test)
+
+  add_executable(device_status_schema_test "${LIBNATKIT_CORE_ROOT}/tests/device_status_schema_test.cpp")
+  target_link_libraries(device_status_schema_test PRIVATE libnatkit-core nlohmann)
+  target_compile_definitions(device_status_schema_test PRIVATE
+    NAT_DEVICE_STATUS_FIXTURE_PATH="${LIBNATKIT_CORE_ROOT}/tests/device_status_golden.json")
+  add_test(NAME device_status_schema_test COMMAND device_status_schema_test)
 endif()
 
 else()

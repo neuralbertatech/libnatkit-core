@@ -392,6 +392,8 @@ DataSchemaDescriptorRegistry &DataSchemaDescriptorRegistry::getDefault() {
     NatSignalFrameDataSchemaV1Descriptor::registerWithRegistry(registry);
     NatImuDataSchemaDescriptor::registerWithRegistry(registry);
     NatImuBulkDataSchemaDescriptor::registerWithRegistry(registry);
+    NatKitNodeStatusV1Descriptor::registerWithRegistry(registry);
+    NatKitPrimaryStatusV1Descriptor::registerWithRegistry(registry);
     NatMuseDataSchemaDescriptor::registerWithRegistry(registry);
     initialized = true;
   }

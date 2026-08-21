@@ -1,0 +1,61 @@
+{
+  "node": {
+    "topic": "natKit/sending/Log-13793649670644-Binary-NatKitNodeStatusV1",
+    "hex": "f4b996958b0c00000c8b9596b9f4a000eee20a00f21c0000850d000000000000158b000000000000806ef2b310000000f4b996958b0c000019a2e32800000000ea9e43c4100000001cf7a5efffffffff2b9d00005240000014e6000000000000ea9e43c410000000380f01004b08000049040100e30a00000b00000001000000e77300002000020001c8e5b50103ce22ecfc0a007a0000000c3600000d0000000100000041000000",
+    "size": 168,
+    "expect": {
+      "device_id": 13793649670644,
+      "mac": "0c:8b:95:96:b9:f4",
+      "leaf_noise_floor_dbm": -96,
+      "data_frames": 713454,
+      "seq_gaps": 7410,
+      "heartbeats": 35605,
+      "last_seen_us": 71738486400,
+      "sync.epoch": 686006809,
+      "sync.ref_offset_us": -274335972,
+      "sync.skew_ppb": 40235,
+      "sync.residual_rms_ns": 16466,
+      "sync.beacons_seen": 69432,
+      "sync.beacons_missed": 2123,
+      "sync.quality": 2,
+      "sync.valid": true,
+      "rssi_last": -56,
+      "leaf_frames_built": 720108,
+      "leaf_frames_dropped": 122,
+      "leaf_send_failures": 13836,
+      "publish_no_shift": 65
+    }
+  },
+  "primary": {
+    "topic": "natKit/sending/Log-203376942053180-Binary-NatKitPrimaryStatusV1",
+    "hex": "3cf76262f8b80000efbdf2b31000000019a2e328a80f030074fb02000400000000000000000000002fc1260051c126000000000006000000a46877570000000039000000a900000040020000e8a70000020100a22a0000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000100000000000000",
+    "size": 144,
+    "expect": {
+      "device_id": 203376942053180,
+      "uptime_us": 71738506735,
+      "epoch": 686006809,
+      "free_heap": 200616,
+      "min_free_heap": 195444,
+      "nodes_known": 4,
+      "nodes_rejected": 0,
+      "frames_queued": 2539823,
+      "frames_sent": 2539857,
+      "frames_dropped": 0,
+      "bytes_sent": 1467443364,
+      "coherence_typical_us": 57,
+      "coherence_bound_us": 169,
+      "coherence_worst_us": 576,
+      "coherence_samples": 42984,
+      "coherence_quality": 2,
+      "coherence_measured": true,
+      "registry_sealed": false,
+      "noise_floor_dbm": -94,
+      "chip_temp_c": 42,
+      "commands_received": 0,
+      "commands_delivered": 0,
+      "commands_undelivered": 0,
+      "reset_reason": 1
+    }
+  },
+  "_note": "Frames captured from the live four-leaf rig on 2026-08-20. The expected values were decoded independently in Python from the firmware's struct declaration, so a C++ offset that drifts is caught against a second reading of the layout rather than against itself."
+}
