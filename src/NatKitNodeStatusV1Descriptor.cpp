@@ -186,6 +186,11 @@ Optional<FieldValueRef> NatKitNodeStatusV1Descriptor::tryGetFieldValue(
     if (f == "leaf_channel_hops") return FieldValueRef::fromUint32(s->leafChannelHops);
     if (f == "publish_no_sync") return FieldValueRef::fromUint32(s->publishNoSync);
     if (f == "publish_no_shift") return FieldValueRef::fromUint32(s->publishNoShift);
+    if (f == "has_probe_sums") return FieldValueRef::fromBool(s->hasProbeSums);
+    if (f == "probe_error_sum_us")
+      return FieldValueRef::fromFloat64(static_cast<double>(s->probeErrorSumUs));
+    if (f == "probe_error_sum_sq") return FieldValueRef::fromUint64(s->probeErrorSumSq);
+    if (f == "probe_error_count") return FieldValueRef::fromUint32(s->probeErrorCount);
     return {};
   }
 

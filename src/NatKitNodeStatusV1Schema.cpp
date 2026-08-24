@@ -8,7 +8,8 @@ namespace nat {
 namespace core {
 
 const std::string NatKitNodeStatusV1Schema::name = "NatKitNodeStatusV1";
-const size_t NatKitNodeStatusV1Schema::kWireSize = 168;
+const size_t NatKitNodeStatusV1Schema::kWireSize = 192;
+const size_t NatKitNodeStatusV1Schema::kLegacyWireSize = 168;
 
 namespace {
 
@@ -103,6 +104,11 @@ constexpr size_t kLeafSendFailures = 152;
 constexpr size_t kLeafChannelHops = 156;
 constexpr size_t kPublishNoSync = 160;
 constexpr size_t kPublishNoShift = 164;
+// --- added by TEC-NATKIT-52; present only in a 192-byte frame ---
+constexpr size_t kProbeErrorSumUs = 168;
+constexpr size_t kProbeErrorSumSq = 176;
+constexpr size_t kProbeErrorCount = 184;
+// 188..191 padding (reserved_probe)
 }  // namespace off
 
 }  // namespace
@@ -120,10 +126,12 @@ uint64_t NatKitNodeStatusV1Schema::getTimestampUs() const { return lastSeenUs; }
 
 Optional<NatKitNodeStatusV1Schema> NatKitNodeStatusV1Schema::decodeBinary(
     const std::vector<uint8_t>& message) {
-  // ⚠️ Exact size or nothing. A short read would decode leading fields fine and
-  // invent the rest, which is worse than refusing: the plausible half is what
-  // gets quoted.
-  if (message.size() != kWireSize) {
+  // ⚠️ One of TWO exact sizes, and nothing in between. A short read would decode
+  // the leading fields fine and invent the rest, which is worse than refusing --
+  // the plausible half is what gets quoted. But the fleet is flashed one board at
+  // a time, so the pre-TEC-NATKIT-52 size stays valid: refusing it would blank the
+  // panel for every leaf not yet done.
+  if (message.size() != kWireSize && message.size() != kLegacyWireSize) {
     return Optional<NatKitNodeStatusV1Schema>();
   }
   const uint8_t* b = message.data();
@@ -175,11 +183,25 @@ Optional<NatKitNodeStatusV1Schema> NatKitNodeStatusV1Schema::decodeBinary(
   s.leafChannelHops = rd32(b, off::kLeafChannelHops);
   s.publishNoSync = rd32(b, off::kPublishNoSync);
   s.publishNoShift = rd32(b, off::kPublishNoShift);
+  s.wireSize = message.size();
+  // ⚠️ The flag, not the values, is what a reader must consult. Leaving the sums
+  // at zero and saying nothing would read as "the probe measured nothing".
+  s.hasProbeSums = message.size() == kWireSize;
+  if (s.hasProbeSums) {
+    s.probeErrorSumUs = static_cast<int64_t>(rd64(b, off::kProbeErrorSumUs));
+    s.probeErrorSumSq = rd64(b, off::kProbeErrorSumSq);
+    s.probeErrorCount = rd32(b, off::kProbeErrorCount);
+  }
   return Optional<NatKitNodeStatusV1Schema>(s);
 }
 
 std::vector<uint8_t> NatKitNodeStatusV1Schema::encodeBinary() const {
-  std::vector<uint8_t> b(kWireSize, 0);
+  // ⚠️ Emit the size this record CAME FROM, so decode->encode is byte-identical
+  // for a legacy frame too. Always emitting the new size would make the round trip
+  // lossy in the one direction that matters: a captured frame from the deployed
+  // firmware is the only fixture there is until the fleet is flashed.
+  const size_t size = wireSize == kLegacyWireSize ? kLegacyWireSize : kWireSize;
+  std::vector<uint8_t> b(size, 0);
   wr64(b, off::kDeviceId, deviceId);
   std::memcpy(b.data() + off::kMac, mac, 6);
   b[off::kLeafNoiseFloorDbm] = static_cast<uint8_t>(leafNoiseFloorDbm);
@@ -221,6 +243,11 @@ std::vector<uint8_t> NatKitNodeStatusV1Schema::encodeBinary() const {
   wr32(b, off::kLeafChannelHops, leafChannelHops);
   wr32(b, off::kPublishNoSync, publishNoSync);
   wr32(b, off::kPublishNoShift, publishNoShift);
+  if (size == kWireSize) {
+    wr64(b, off::kProbeErrorSumUs, static_cast<uint64_t>(probeErrorSumUs));
+    wr64(b, off::kProbeErrorSumSq, probeErrorSumSq);
+    wr32(b, off::kProbeErrorCount, probeErrorCount);
+  }
   return b;
 }
 
@@ -269,6 +296,10 @@ std::string NatKitNodeStatusV1Schema::toJson() const {
     << ",\"leaf_channel_hops\":" << leafChannelHops
     << ",\"publish_no_sync\":" << publishNoSync
     << ",\"publish_no_shift\":" << publishNoShift
+    << ",\"has_probe_sums\":" << (hasProbeSums ? "true" : "false")
+    << ",\"probe_error_sum_us\":" << probeErrorSumUs
+    << ",\"probe_error_sum_sq\":" << probeErrorSumSq
+    << ",\"probe_error_count\":" << probeErrorCount
     << "}";
   return o.str();
 }

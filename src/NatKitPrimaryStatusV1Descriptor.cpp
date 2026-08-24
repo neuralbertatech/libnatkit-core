@@ -105,6 +105,21 @@ SchemaFieldDescriptor buildRootField() {
                                 "Cumulative: resends after no acknowledgement"),
           SchemaFieldDescriptor("commands_undelivered", "Commands undelivered", FieldValueType::Uint32,
                                 "Cumulative: commands given up on; the one to alarm on"),
+          // ⚠️ The rig-wide coherence accumulators (TEC-NATKIT-52). coherence_bound_us
+          // above is an average since boot: two readings a day apart differ mostly
+          // because more history accumulated, not because the rig changed.
+          SchemaFieldDescriptor("has_coherence_sums", "Reports coherence sums",
+                                FieldValueType::Bool,
+                                "False on firmware predating them — NOT the same as zero"),
+          SchemaFieldDescriptor("spread_sum_us", "Pair-spread sum",
+                                FieldValueType::Float64,
+                                "Sum of pairwise spreads; difference two samples for a "
+                                "windowed mean", "us"),
+          SchemaFieldDescriptor("spread_sum_sq", "Pair-spread sum of squares",
+                                FieldValueType::Uint64,
+                                "With the sum and markers_paired, gives a windowed sd"),
+          SchemaFieldDescriptor("markers_paired", "Markers paired", FieldValueType::Uint32,
+                                "Samples behind the two sums"),
           SchemaFieldDescriptor("reset_reason", "Reset reason", FieldValueType::Uint32,
                                 "esp_reset_reason() from the hub's last boot; 1 = power-on"),
       });
@@ -184,6 +199,11 @@ Optional<FieldValueRef> NatKitPrimaryStatusV1Descriptor::tryGetFieldValue(
     if (f == "command_retransmits") return FieldValueRef::fromUint32(s->commandRetransmits);
     if (f == "commands_undelivered") return FieldValueRef::fromUint32(s->commandsUndelivered);
     if (f == "reset_reason") return FieldValueRef::fromUint32(s->resetReason);
+    if (f == "has_coherence_sums") return FieldValueRef::fromBool(s->hasCoherenceSums);
+    if (f == "spread_sum_us")
+      return FieldValueRef::fromFloat64(static_cast<double>(s->spreadSumUs));
+    if (f == "spread_sum_sq") return FieldValueRef::fromUint64(s->spreadSumSq);
+    if (f == "markers_paired") return FieldValueRef::fromUint32(s->markersPaired);
   return {};
 }
 

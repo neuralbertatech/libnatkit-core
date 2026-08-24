@@ -6,7 +6,8 @@ namespace nat {
 namespace core {
 
 const std::string NatKitPrimaryStatusV1Schema::name = "NatKitPrimaryStatusV1";
-const size_t NatKitPrimaryStatusV1Schema::kWireSize = 144;
+const size_t NatKitPrimaryStatusV1Schema::kWireSize = 168;
+const size_t NatKitPrimaryStatusV1Schema::kLegacyWireSize = 144;
 
 namespace {
 
@@ -83,6 +84,12 @@ constexpr size_t kCommandsDelivered = 124;
 constexpr size_t kCommandRetransmits = 128;
 constexpr size_t kCommandsUndelivered = 132;
 constexpr size_t kResetReason = 136;
+// 140..143 tail padding on the legacy layout; the sums begin at 144.
+// --- added by TEC-NATKIT-52; present only in a 168-byte frame ---
+constexpr size_t kSpreadSumUs = 144;
+constexpr size_t kSpreadSumSq = 152;
+constexpr size_t kMarkersPaired = 160;
+// 164..167 padding (reserved_coherence)
 }  // namespace off
 
 }  // namespace
@@ -100,8 +107,9 @@ uint64_t NatKitPrimaryStatusV1Schema::getTimestampUs() const { return uptimeUs; 
 
 Optional<NatKitPrimaryStatusV1Schema> NatKitPrimaryStatusV1Schema::decodeBinary(
     const std::vector<uint8_t>& message) {
-  // ⚠️ Exact size or nothing — see NatKitNodeStatusV1Schema::decodeBinary.
-  if (message.size() != kWireSize) {
+  // ⚠️ One of two exact sizes — see NatKitNodeStatusV1Schema::decodeBinary for why
+  // the pre-TEC-NATKIT-52 size stays valid.
+  if (message.size() != kWireSize && message.size() != kLegacyWireSize) {
     return Optional<NatKitPrimaryStatusV1Schema>();
   }
   const uint8_t* b = message.data();
@@ -142,11 +150,20 @@ Optional<NatKitPrimaryStatusV1Schema> NatKitPrimaryStatusV1Schema::decodeBinary(
   s.commandRetransmits = rd32(b, off::kCommandRetransmits);
   s.commandsUndelivered = rd32(b, off::kCommandsUndelivered);
   s.resetReason = rd32(b, off::kResetReason);
+  s.wireSize = message.size();
+  s.hasCoherenceSums = message.size() == kWireSize;
+  if (s.hasCoherenceSums) {
+    s.spreadSumUs = static_cast<int64_t>(rd64(b, off::kSpreadSumUs));
+    s.spreadSumSq = rd64(b, off::kSpreadSumSq);
+    s.markersPaired = rd32(b, off::kMarkersPaired);
+  }
   return Optional<NatKitPrimaryStatusV1Schema>(s);
 }
 
 std::vector<uint8_t> NatKitPrimaryStatusV1Schema::encodeBinary() const {
-  std::vector<uint8_t> b(kWireSize, 0);
+  // Emit the size this record came from — see the node schema for why.
+  const size_t size = wireSize == kLegacyWireSize ? kLegacyWireSize : kWireSize;
+  std::vector<uint8_t> b(size, 0);
   wr64(b, off::kDeviceId, deviceId);
   wr64(b, off::kUptimeUs, uptimeUs);
   wr32(b, off::kEpoch, epoch);
@@ -183,6 +200,11 @@ std::vector<uint8_t> NatKitPrimaryStatusV1Schema::encodeBinary() const {
   wr32(b, off::kCommandRetransmits, commandRetransmits);
   wr32(b, off::kCommandsUndelivered, commandsUndelivered);
   wr32(b, off::kResetReason, resetReason);
+  if (size == kWireSize) {
+    wr64(b, off::kSpreadSumUs, static_cast<uint64_t>(spreadSumUs));
+    wr64(b, off::kSpreadSumSq, spreadSumSq);
+    wr32(b, off::kMarkersPaired, markersPaired);
+  }
   return b;
 }
 
@@ -224,6 +246,10 @@ std::string NatKitPrimaryStatusV1Schema::toJson() const {
     << ",\"command_retransmits\":" << commandRetransmits
     << ",\"commands_undelivered\":" << commandsUndelivered
     << ",\"reset_reason\":" << resetReason
+    << ",\"has_coherence_sums\":" << (hasCoherenceSums ? "true" : "false")
+    << ",\"spread_sum_us\":" << spreadSumUs
+    << ",\"spread_sum_sq\":" << spreadSumSq
+    << ",\"markers_paired\":" << markersPaired
     << "}";
   return o.str();
 }

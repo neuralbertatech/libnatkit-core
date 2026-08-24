@@ -57,5 +57,32 @@
       "reset_reason": 1
     }
   },
-  "_note": "Frames captured from the live four-leaf rig on 2026-08-20. The expected values were decoded independently in Python from the firmware's struct declaration, so a C++ offset that drifts is caught against a second reading of the layout rather than against itself."
+  "_note": "The `node`/`primary` frames were captured from the live four-leaf rig on 2026-08-20 and are the PRE-TEC-NATKIT-52 sizes (168/144), which the decoder still accepts because the fleet is flashed one board at a time. The `*_extended` frames are those same bytes with the accumulators appended, built here in Python from the firmware's struct declaration -- they cannot be captured until a board is flashed, so this is the independent second reading of the layout in the meantime. The firmware also asserts every one of these offsets with offsetof(), so a field inserted there breaks the FIRMWARE build.",
+  "node_extended": {
+    "topic": "natKit/sending/Log-13793649670644-Binary-NatKitNodeStatusV1",
+    "hex": "f4b996958b0c00000c8b9596b9f4a000eee20a00f21c0000850d000000000000158b000000000000806ef2b310000000f4b996958b0c000019a2e32800000000ea9e43c4100000001cf7a5efffffffff2b9d00005240000014e6000000000000ea9e43c410000000380f01004b08000049040100e30a00000b00000001000000e77300002000020001c8e5b50103ce22ecfc0a007a0000000c3600000d0000000100000041000000c3b3f9ffffffffffea16b04c02000000cc76000000000000",
+    "size": 192,
+    "expect": {
+      "has_probe_sums": true,
+      "probe_error_sum_us": -412733,
+      "probe_error_sum_sq": 9876543210,
+      "probe_error_count": 30412,
+      "device_id": 13793649670644,
+      "leaf_send_failures": 13836,
+      "sync.skew_ppb": 40235
+    }
+  },
+  "primary_extended": {
+    "topic": "natKit/sending/Log-203376942053180-Binary-NatKitPrimaryStatusV1",
+    "hex": "3cf76262f8b80000efbdf2b31000000019a2e328a80f030074fb02000400000000000000000000002fc1260051c126000000000006000000a46877570000000039000000a900000040020000e8a70000020100a22a0000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000100000000000000976212000000000015339dd50c000000e8a7000000000000",
+    "size": 168,
+    "expect": {
+      "has_coherence_sums": true,
+      "spread_sum_us": 1204887,
+      "spread_sum_sq": 55123456789,
+      "markers_paired": 42984,
+      "device_id": 203376942053180,
+      "coherence_bound_us": 169
+    }
+  }
 }

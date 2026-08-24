@@ -244,6 +244,86 @@ int main() {
                "cross-check: last_seen_us must sit just under uptime_us");
   }
 
+
+  // --- the grown frames (TEC-NATKIT-52) -----------------------------------
+  //
+  // ⚠️ The point of these two cases is that BOTH sizes work. The fleet is flashed
+  // one board at a time, so on the day of the change every frame on the wire is
+  // still the old size — a decoder that only accepted the new one would blank the
+  // health panel for the whole rig, and a decoder that only accepted the old one
+  // would silently ignore the very figures the change was made for.
+  {
+    const auto &entry = golden.at("node_extended");
+    const auto bytes = fromHex(entry.at("hex").get<std::string>());
+    expectTrue(bytes.size() == 192u, "extended node frame is 192 bytes");
+
+    const auto decoded = nat::core::NatKitNodeStatusV1Schema::decodeBinary(bytes);
+    if (!decoded.has_value()) {
+      std::printf("FAIL: extended node status did not decode\n");
+      return 1;
+    }
+    const auto record = decoded.value();
+    expectTrue(record.hasProbeSums, "extended node reports probe sums");
+
+    const auto descriptorMaybe =
+        registry.findBySchemaName(nat::core::NatKitNodeStatusV1Schema::name);
+    const auto &descriptor = *descriptorMaybe.value();
+    for (auto it = entry.at("expect").begin(); it != entry.at("expect").end(); ++it) {
+      expectField(descriptor, record, it.key(), it.value());
+    }
+    expectTrue(record.encodeBinary() == bytes, "extended node: encode(decode(x)) == x");
+  }
+
+  {
+    const auto &entry = golden.at("primary_extended");
+    const auto bytes = fromHex(entry.at("hex").get<std::string>());
+    expectTrue(bytes.size() == 168u, "extended primary frame is 168 bytes");
+
+    const auto decoded = nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(bytes);
+    if (!decoded.has_value()) {
+      std::printf("FAIL: extended primary status did not decode\n");
+      return 1;
+    }
+    const auto record = decoded.value();
+    expectTrue(record.hasCoherenceSums, "extended primary reports coherence sums");
+
+    const auto descriptorMaybe =
+        registry.findBySchemaName(nat::core::NatKitPrimaryStatusV1Schema::name);
+    const auto &descriptor = *descriptorMaybe.value();
+    for (auto it = entry.at("expect").begin(); it != entry.at("expect").end(); ++it) {
+      expectField(descriptor, record, it.key(), it.value());
+    }
+    expectTrue(record.encodeBinary() == bytes, "extended primary: encode(decode(x)) == x");
+  }
+
+  // ⚠️ And the LEGACY frames must say the sums are ABSENT, not zero. A reader that
+  // sees zeroes and no flag concludes the probe measured nothing, when the truth is
+  // that this firmware does not report it.
+  {
+    const auto node = nat::core::NatKitNodeStatusV1Schema::decodeBinary(
+        fromHex(golden.at("node").at("hex").get<std::string>()));
+    const auto primary = nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(
+        fromHex(golden.at("primary").at("hex").get<std::string>()));
+    expectTrue(node.has_value() && !node.value().hasProbeSums,
+               "a legacy node frame reports its sums as absent");
+    expectTrue(primary.has_value() && !primary.value().hasCoherenceSums,
+               "a legacy primary frame reports its sums as absent");
+    // Round-tripping a legacy frame must stay legacy-sized, or the only fixture
+    // that exists until the fleet is flashed stops being usable.
+    expectTrue(node.value().encodeBinary().size() == 168u,
+               "a legacy node frame re-encodes at 168 bytes");
+    expectTrue(primary.value().encodeBinary().size() == 144u,
+               "a legacy primary frame re-encodes at 144 bytes");
+  }
+
+  // A size between the two is still refused: it is neither firmware.
+  {
+    auto between = fromHex(golden.at("node").at("hex").get<std::string>());
+    between.resize(180);
+    expectTrue(!nat::core::NatKitNodeStatusV1Schema::decodeBinary(between).has_value(),
+               "a size between the two layouts is refused");
+  }
+
   if (g_failures > 0) {
     std::printf("device_status_schema_test: %d failure(s)\n", g_failures);
     return 1;

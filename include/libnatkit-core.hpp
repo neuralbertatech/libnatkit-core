@@ -1128,9 +1128,17 @@ public:
 class NatKitNodeStatusV1Schema : public Schema, public Decoder {
 public:
   static const std::string name;
-  // The published payload is exactly this size; anything else is refused rather
-  // than decoded partially.
+  // The published payload is one of exactly two sizes; anything else is refused
+  // rather than decoded partially.
   static const size_t kWireSize;
+  /**
+   * ⚠️ The size before the probe accumulators were added (TEC-NATKIT-52).
+   *
+   * Still accepted, and that is deliberate rather than charity: the fleet is
+   * flashed one board at a time, so refusing the old size would blank the health
+   * panel for every leaf not yet done — on the day of the change, all of them.
+   */
+  static const size_t kLegacyWireSize;
 
   uint64_t deviceId = 0;
   uint8_t mac[6] = {};
@@ -1185,6 +1193,23 @@ public:
   uint32_t publishNoSync = 0;
   uint32_t publishNoShift = 0;
 
+  // The raw probe accumulators (TEC-NATKIT-52), so a consumer can compute the
+  // mean and sd over a WINDOW instead of since the primary booted. Sums are over
+  // typical samples only, matching probeErrorCount.
+  int64_t probeErrorSumUs = 0;
+  uint64_t probeErrorSumSq = 0;
+  uint32_t probeErrorCount = 0;
+  /**
+   * ⚠️ Whether this frame carried them at all.
+   *
+   * A pre-TEC-NATKIT-52 board sends the shorter frame, and its sums are ABSENT —
+   * which is not the same as zero. Zero sums with a zero count would read as "the
+   * probe measured nothing", when the truth is "this firmware does not report it".
+   */
+  bool hasProbeSums = false;
+  /** The size this record was decoded from, so an encode round-trips exactly. */
+  size_t wireSize = 0;
+
   NatKitNodeStatusV1Schema() = default;
 
   bool isSerializationTypeSupported(const SerializationType) const override;
@@ -1237,6 +1262,8 @@ class NatKitPrimaryStatusV1Schema : public Schema, public Decoder {
 public:
   static const std::string name;
   static const size_t kWireSize;
+  /** See NatKitNodeStatusV1Schema::kLegacyWireSize — same reasoning. */
+  static const size_t kLegacyWireSize;
 
   uint64_t deviceId = 0;
   uint64_t uptimeUs = 0;
@@ -1274,6 +1301,16 @@ public:
   uint32_t commandRetransmits = 0;
   uint32_t commandsUndelivered = 0;
   uint32_t resetReason = 0;
+
+  // The rig-wide coherence accumulators (TEC-NATKIT-52). The derived
+  // coherence_typical_us / _bound_us are averages since boot and cannot compare
+  // two conditions; these can be differenced over a window.
+  int64_t spreadSumUs = 0;
+  uint64_t spreadSumSq = 0;
+  uint32_t markersPaired = 0;
+  /** ⚠️ Absent on a pre-TEC-NATKIT-52 board, which is not the same as zero. */
+  bool hasCoherenceSums = false;
+  size_t wireSize = 0;
 
   NatKitPrimaryStatusV1Schema() = default;
 
