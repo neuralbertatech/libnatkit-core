@@ -316,6 +316,73 @@ int main() {
                "a legacy primary frame re-encodes at 144 bytes");
   }
 
+  // --- presence, and why it needs two bytes (TEC-NATKIT-81) ---------------
+  //
+  // The `primary` fixture is the frame from the fault itself: nodes_known 4, on a
+  // rig where one of those four had been off the air for hours. That is the whole
+  // problem in one field, and it is why the hub now also reports how many nodes it
+  // can actually HEAR.
+  //
+  // ⚠️ The flag is not ceremony. A hub too old to report presence sends zero in
+  // that byte, and zero present is a REAL state -- every leaf gone, the worst news
+  // the rig can carry. Without a second byte those two readings are the same
+  // bytes, and the panel would either cry wolf on every un-flashed hub or stay
+  // silent on a rig that had lost everything. The three cases are pinned here
+  // together because it is only together that they show the flag earns its byte.
+  {
+    const auto legacyBytes = fromHex(golden.at("primary").at("hex").get<std::string>());
+    const auto legacy = nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(legacyBytes);
+    expectTrue(legacy.has_value() && legacy.value().nodesPresentValid == 0,
+               "presence: the captured pre-TEC-NATKIT-81 frame reports presence as UNKNOWN");
+    expectTrue(legacy.has_value() && legacy.value().nodesKnown == 4,
+               "presence: ... while still claiming four nodes on the roster");
+
+    // Same bytes, presence reported, and everything present.
+    auto healthy = legacyBytes;
+    healthy[86] = 4;
+    healthy[87] = 1;
+    const auto healthyRecord =
+        nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(healthy);
+    expectTrue(healthyRecord.has_value() && healthyRecord.value().nodesPresentValid == 1 &&
+                   healthyRecord.value().nodesPresent == 4,
+               "presence: four of four heard");
+
+    // The fault as this firmware would have published it: one board on the roster
+    // and off the air. nodes_known does not move -- that is correct, the roster is
+    // persistent -- and the discrepancy is the whole signal.
+    auto degraded = legacyBytes;
+    degraded[86] = 3;
+    degraded[87] = 1;
+    const auto degradedRecord =
+        nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(degraded);
+    expectTrue(degradedRecord.has_value() && degradedRecord.value().nodesPresent == 3 &&
+                   degradedRecord.value().nodesKnown == 4,
+               "presence: three heard of four on the roster");
+
+    // ⚠️ Zero present WITH the flag set is the case the flag exists for: it must
+    // not decode the same way the legacy frame above does.
+    auto silent = legacyBytes;
+    silent[86] = 0;
+    silent[87] = 1;
+    const auto silentRecord =
+        nat::core::NatKitPrimaryStatusV1Schema::decodeBinary(silent);
+    expectTrue(silentRecord.has_value() && silentRecord.value().nodesPresentValid == 1 &&
+                   silentRecord.value().nodesPresent == 0,
+               "presence: nothing heard is REPORTED, not mistaken for unreported");
+
+    // Both bytes survive a round trip, which is what proves they landed in the
+    // spare bytes rather than on top of a neighbour.
+    expectTrue(degradedRecord.value().encodeBinary() == degraded,
+               "presence: encode(decode(x)) == x with the presence bytes set");
+
+    // And the descriptor reaches them, or the panel cannot show them.
+    const auto presenceDescriptorMaybe =
+        registry.findBySchemaName(nat::core::NatKitPrimaryStatusV1Schema::name);
+    const auto &presenceDescriptor = *presenceDescriptorMaybe.value();
+    expectField(presenceDescriptor, degradedRecord.value(), "nodes_present", 3);
+    expectField(presenceDescriptor, degradedRecord.value(), "nodes_present_valid", true);
+  }
+
   // A size between the two is still refused: it is neither firmware.
   {
     auto between = fromHex(golden.at("node").at("hex").get<std::string>());
