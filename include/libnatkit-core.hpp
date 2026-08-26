@@ -1046,6 +1046,79 @@ public:
   static DataSchemaDescriptorRegistry &getDefault();
 };
 
+// One control as a DEVICE advertises it (TEC-NATKIT-10).
+//
+// ⚠️ This is the device's half only: which controls exist and how to drive them.
+// The words a person reads come from DeviceControlDescriptorRegistry, so a
+// 1470-byte radio packet does not have to carry prose.
+//
+// `label`/`description`/`unit` are nonetheless present and OPTIONAL, as an escape
+// hatch: hardware whose controls no library describes can speak for itself rather
+// than rendering as a bare id. They are a fallback, not the primary source.
+struct DeviceControlAdvertisement {
+  std::string controlId;
+  std::string kind;          // "button" | "toggle" | "input"
+  std::string group;         // controls read together; empty if it stands alone
+  std::string readCommand;   // empty for a button
+  std::string writeCommand;
+  std::string field;         // the args key on the wire
+  std::string valueType;     // a FieldValueType name; empty means Bool
+  std::string label;         // optional, the device's own words
+  std::string description;   // optional
+  std::string unit;          // optional
+  bool ranged = false;
+  double minValue = 0.0;
+  double maxValue = 0.0;
+};
+
+// What a device says it can do, carried on the HARDWARE_CONFIGURATION channel as
+// Configuration-<device_id>-Json-NatKitDeviceControlsV1.
+//
+// ⚠️ RETAINED on MQTT, deliberately, so a late subscriber learns what exists
+// without waiting for a change. That is safe ONLY because reachability lives on
+// the Heartbeat channel instead: a retained advertisement stays informative
+// ("this is what the board offers") without being actionable, and nothing has to
+// be actively cleared when an advertiser dies. Heartbeat's requirement is the
+// exact inverse -- never retained, because a retained "I am alive" is a lie from
+// the moment it stops being true.
+class NatKitDeviceControlsV1Schema : public Schema, public Decoder {
+public:
+  static const std::string name;
+  static const std::string schemaVersionTag;
+
+  uint64_t deviceId = 0;
+  // Who published it. Differs from deviceId when a bridge microcontroller speaks
+  // for hardware that cannot be flashed. ⚠️ A proxied advertisement says nothing
+  // about whether the end device is still there -- that is the Heartbeat
+  // channel's job, and the reason this struct carries no staleness field.
+  uint64_t advertiserDeviceId = 0;
+  std::vector<DeviceControlAdvertisement> controls;
+
+  NatKitDeviceControlsV1Schema() = default;
+
+  bool isSerializationTypeSupported(const SerializationType) const override;
+  std::unique_ptr<message_t> encodeToBytes(const SerializationType &type) const override;
+  std::string getName() const override;
+  std::string toString() const override;
+
+  Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+
+  static Optional<NatKitDeviceControlsV1Schema> decodeJson(
+      const std::vector<uint8_t> &message);
+
+  std::string toJson() const;
+
+  // ⚠️ THE ALLOWLIST, DERIVED. Every command the advertised controls may cause,
+  // read commands included. The server permits exactly this set, so what the UI
+  // can offer and what the server will send come from one source and cannot
+  // disagree.
+  std::vector<std::string> allowedCommands() const;
+
+  static void registerWithRegistry(Registry &registry);
+};
+
 // --- Device controls (TEC-NATKIT-10) ----------------------------------------
 //
 // What a DEVICE can be asked to do, as against what a stream contains. A board

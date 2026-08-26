@@ -36,6 +36,7 @@ set(LIBNATKIT_CORE_SRC_FILES
   "${LIBNATKIT_CORE_ROOT}/src/BasicTopicInformation.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/DataSchemaDescriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/DeviceControlDescriptor.cpp"
+  "${LIBNATKIT_CORE_ROOT}/src/NatKitDeviceControlsV1Schema.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgDataSchemaV1.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgDataSchemaV1Descriptor.cpp"
   "${LIBNATKIT_CORE_ROOT}/src/ExgPillEmgTransformDataSchemaV1.cpp"
@@ -126,6 +127,10 @@ if(LIBNATKIT_CORE_BUILD_TESTS)
   target_link_libraries(imu_frame_version_test PRIVATE libnatkit-core nlohmann)
   add_test(NAME imu_frame_version_test COMMAND imu_frame_version_test)
 
+  add_executable(device_controls_schema_test "${LIBNATKIT_CORE_ROOT}/tests/device_controls_schema_test.cpp")
+  target_link_libraries(device_controls_schema_test PRIVATE libnatkit-core nlohmann)
+  add_test(NAME device_controls_schema_test COMMAND device_controls_schema_test)
+
   add_executable(device_control_registry_test "${LIBNATKIT_CORE_ROOT}/tests/device_control_registry_test.cpp")
   target_link_libraries(device_control_registry_test PRIVATE libnatkit-core)
   add_test(NAME device_control_registry_test COMMAND device_control_registry_test)
@@ -144,6 +149,7 @@ idf_component_register(
   "src/BasicTopicInformation.cpp"
   "src/DataSchemaDescriptor.cpp"
   "src/DeviceControlDescriptor.cpp"
+  "src/NatKitDeviceControlsV1Schema.cpp"
   "src/ExgPillEmgDataSchemaV1.cpp"
   "src/ExgPillEmgDataSchemaV1Descriptor.cpp"
   "src/ExgPillEmgTransformDataSchemaV1.cpp"
