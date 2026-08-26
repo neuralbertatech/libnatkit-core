@@ -32,6 +32,13 @@ std::unique_ptr<Registry> Registry::createDefaultInitalizeRegistry() {
   NatMuseBulkDataSchema::registerWithRegistry(*registry);
   NatKitNodeStatusV1Schema::registerWithRegistry(*registry);
   NatKitPrimaryStatusV1Schema::registerWithRegistry(*registry);
+  // ⚠️ The Configuration channel is OPEN. A third-party record type registers
+  // itself here the same way, keyed by the schema name already in its topic
+  // (Configuration-<id>-Json-AcmeHookupsV1), so "typed records with a registered
+  // type id" needs no new mechanism -- the topic carries the id and this
+  // registry carries the decoder. NatKitDeviceControlsV1 is simply the first
+  // record type on that channel, not the channel's only meaning.
+  NatKitDeviceControlsV1Schema::registerWithRegistry(*registry);
 
   return registry;
 }

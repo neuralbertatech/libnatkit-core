@@ -1046,6 +1046,163 @@ public:
   static DataSchemaDescriptorRegistry &getDefault();
 };
 
+// One control as a DEVICE advertises it (TEC-NATKIT-10).
+//
+// ⚠️ This is the device's half only: which controls exist and how to drive them.
+// The words a person reads come from DeviceControlDescriptorRegistry, so a
+// 1470-byte radio packet does not have to carry prose.
+//
+// `label`/`description`/`unit` are nonetheless present and OPTIONAL, as an escape
+// hatch: hardware whose controls no library describes can speak for itself rather
+// than rendering as a bare id. They are a fallback, not the primary source.
+struct DeviceControlAdvertisement {
+  std::string controlId;
+  std::string kind;          // "button" | "toggle" | "input"
+  std::string group;         // controls read together; empty if it stands alone
+  std::string readCommand;   // empty for a button
+  std::string writeCommand;
+  std::string field;         // the args key on the wire
+  std::string valueType;     // a FieldValueType name; empty means Bool
+  std::string label;         // optional, the device's own words
+  std::string description;   // optional
+  std::string unit;          // optional
+  bool ranged = false;
+  double minValue = 0.0;
+  double maxValue = 0.0;
+};
+
+// What a device says it can do, carried on the HARDWARE_CONFIGURATION channel as
+// Configuration-<device_id>-Json-NatKitDeviceControlsV1.
+//
+// ⚠️ RETAINED on MQTT, deliberately, so a late subscriber learns what exists
+// without waiting for a change. That is safe ONLY because reachability lives on
+// the Heartbeat channel instead: a retained advertisement stays informative
+// ("this is what the board offers") without being actionable, and nothing has to
+// be actively cleared when an advertiser dies. Heartbeat's requirement is the
+// exact inverse -- never retained, because a retained "I am alive" is a lie from
+// the moment it stops being true.
+class NatKitDeviceControlsV1Schema : public Schema, public Decoder {
+public:
+  static const std::string name;
+  static const std::string schemaVersionTag;
+
+  uint64_t deviceId = 0;
+  // Who published it. Differs from deviceId when a bridge microcontroller speaks
+  // for hardware that cannot be flashed. ⚠️ A proxied advertisement says nothing
+  // about whether the end device is still there -- that is the Heartbeat
+  // channel's job, and the reason this struct carries no staleness field.
+  uint64_t advertiserDeviceId = 0;
+  std::vector<DeviceControlAdvertisement> controls;
+
+  NatKitDeviceControlsV1Schema() = default;
+
+  bool isSerializationTypeSupported(const SerializationType) const override;
+  std::unique_ptr<message_t> encodeToBytes(const SerializationType &type) const override;
+  std::string getName() const override;
+  std::string toString() const override;
+
+  Optional<std::shared_ptr<Schema>> tryDecode(
+      const std::vector<uint8_t> &message,
+      const SerializationType &type) const override;
+
+  static Optional<NatKitDeviceControlsV1Schema> decodeJson(
+      const std::vector<uint8_t> &message);
+
+  std::string toJson() const;
+
+  // ⚠️ THE ALLOWLIST, DERIVED. Every command the advertised controls may cause,
+  // read commands included. The server permits exactly this set, so what the UI
+  // can offer and what the server will send come from one source and cannot
+  // disagree.
+  std::vector<std::string> allowedCommands() const;
+
+  static void registerWithRegistry(Registry &registry);
+};
+
+// --- Device controls (TEC-NATKIT-10) ----------------------------------------
+//
+// The WORDS for a control. Nothing else.
+//
+// ⚠️ THE SPLIT IS STRICT, AND THAT IS THE WHOLE DESIGN. The device owns the
+// CONTRACT -- which controls exist, their kind, which commands drive them, the
+// args key, the type and any range -- because only the device knows what it was
+// flashed with. That travels in DeviceControlAdvertisement, on the wire. This
+// registry owns only the PROSE, because a label is presentation and does not
+// belong in a 1470-byte radio packet.
+//
+// ⚠️ NEITHER SIDE MAY CARRY THE OTHER'S HALF. An earlier draft of this class also
+// held readCommand/writeCommand/field/valueType/range -- every one of which the
+// advertisement already carries. Two copies of a contract is exactly the
+// duplication this architecture exists to prevent: they drift, and then the UI
+// offers a command the device does not implement while both sides look correct.
+// If something here needs to know how a control is driven, it reads the
+// advertisement.
+//
+// ⚠️ AND IT IS AN EXTENSION POINT, not a table. A third-party library registers
+// descriptors for the controls its own hardware exposes, without modifying any
+// natKit source -- the same way DataSchemaDescriptorRegistry already works for
+// stream schemas.
+enum class DeviceControlKind {
+  // A one-shot action. No state to read; pressing it IS the whole interaction.
+  Button,
+  // A boolean, in a group read together and written one at a time.
+  Toggle,
+  // A typed value, using the FieldValueType vocabulary above rather than a
+  // parallel one.
+  Input,
+};
+
+std::string toString(const DeviceControlKind kind);
+Optional<DeviceControlKind> deviceControlKindFromString(const std::string &name);
+
+class DeviceControlDescriptor {
+  std::string controlId;
+  std::string label;
+  std::string description;
+  std::string unit;
+
+public:
+  DeviceControlDescriptor();
+  DeviceControlDescriptor(const std::string &controlId,
+                          const std::string &label,
+                          const std::string &description = std::string{},
+                          const std::string &unit = std::string{});
+
+  const std::string &getControlId() const;
+  const std::string &getLabel() const;
+  const std::string &getDescription() const;
+  const std::string &getUnit() const;
+};
+
+class DeviceControlDescriptorRegistry {
+  std::unordered_map<std::string, std::shared_ptr<const DeviceControlDescriptor>>
+      descriptorsByControlId;
+
+public:
+  // ⚠️ LAST REGISTRATION WINS, matching DataSchemaDescriptorRegistry. That is
+  // deliberate: it lets a library re-word or translate a control natKit already
+  // describes without forking it. Returns true if it displaced an existing
+  // descriptor, so a caller that did not intend to override can notice.
+  //
+  // ⚠️ Contrast MetaRecord::registerMetaRecordType, which is FIRST-wins. The
+  // difference is justified rather than accidental: a decoder is correctness and
+  // must not be hijacked; a label is presentation and should be overridable.
+  bool registerDescriptor(
+      const std::shared_ptr<const DeviceControlDescriptor> &descriptor);
+
+  Optional<std::shared_ptr<const DeviceControlDescriptor>> findByControlId(
+      const std::string &controlId) const;
+
+  // Sorted, for diagnostics and tests -- "what does this build know about?"
+  std::vector<std::string> registeredControlIds() const;
+
+  static DeviceControlDescriptorRegistry &getDefault();
+};
+
+// natKit's own controls. Called by getDefault(); exposed so a test or a host
+// embedding the library can build a registry that does not share global state.
+void registerNatKitDeviceControls(DeviceControlDescriptorRegistry &registry);
+
 class ExgPillEmgDataSchemaV1Descriptor : public DataSchemaDescriptor {
 public:
   static const std::string name;
