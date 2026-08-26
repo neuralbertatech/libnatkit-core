@@ -1121,15 +1121,22 @@ public:
 
 // --- Device controls (TEC-NATKIT-10) ----------------------------------------
 //
-// What a DEVICE can be asked to do, as against what a stream contains. A board
-// advertises the control IDS it supports on its Configuration channel; the
-// human-facing half -- label, description, unit, range -- is resolved here.
+// The WORDS for a control. Nothing else.
 //
-// ⚠️ THE SPLIT IS THE POINT. The device is the only authority on what EXISTS,
-// because only the device knows what it was flashed with. The registry is the
-// only authority on what it is CALLED, because a label is presentation and does
-// not belong in a 1470-byte radio packet. Neither side can invent the other's
-// half, so they cannot drift into disagreeing about the same thing.
+// ⚠️ THE SPLIT IS STRICT, AND THAT IS THE WHOLE DESIGN. The device owns the
+// CONTRACT -- which controls exist, their kind, which commands drive them, the
+// args key, the type and any range -- because only the device knows what it was
+// flashed with. That travels in DeviceControlAdvertisement, on the wire. This
+// registry owns only the PROSE, because a label is presentation and does not
+// belong in a 1470-byte radio packet.
+//
+// ⚠️ NEITHER SIDE MAY CARRY THE OTHER'S HALF. An earlier draft of this class also
+// held readCommand/writeCommand/field/valueType/range -- every one of which the
+// advertisement already carries. Two copies of a contract is exactly the
+// duplication this architecture exists to prevent: they drift, and then the UI
+// offers a command the device does not implement while both sides look correct.
+// If something here needs to know how a control is driven, it reads the
+// advertisement.
 //
 // ⚠️ AND IT IS AN EXTENSION POINT, not a table. A third-party library registers
 // descriptors for the controls its own hardware exposes, without modifying any
@@ -1153,59 +1160,18 @@ class DeviceControlDescriptor {
   std::string label;
   std::string description;
   std::string unit;
-  DeviceControlKind kind;
-  FieldValueType valueType;
-  // Controls sharing a read command. Empty for a control that stands alone.
-  std::string group;
-  // The command that reads this control's state. Empty for a Button: there is
-  // nothing to read.
-  std::string readCommand;
-  // The command that acts. For a Button this is the action itself.
-  std::string writeCommand;
-  // The argument key on the wire -- "accel", "quarter_dbm". Empty for a Button.
-  std::string field;
-  bool ranged;
-  double minValue;
-  double maxValue;
-  std::vector<std::string> enumValues;
 
 public:
   DeviceControlDescriptor();
-  DeviceControlDescriptor(
-      const std::string &controlId,
-      const std::string &label,
-      DeviceControlKind kind,
-      const std::string &writeCommand,
-      const std::string &readCommand = std::string{},
-      const std::string &field = std::string{},
-      FieldValueType valueType = FieldValueType::Bool,
-      const std::string &description = std::string{},
-      const std::string &unit = std::string{},
-      const std::string &group = std::string{},
-      bool ranged = false,
-      double minValue = 0.0,
-      double maxValue = 0.0,
-      const std::vector<std::string> &enumValues = std::vector<std::string>{});
+  DeviceControlDescriptor(const std::string &controlId,
+                          const std::string &label,
+                          const std::string &description = std::string{},
+                          const std::string &unit = std::string{});
 
   const std::string &getControlId() const;
   const std::string &getLabel() const;
   const std::string &getDescription() const;
   const std::string &getUnit() const;
-  DeviceControlKind getKind() const;
-  FieldValueType getValueType() const;
-  const std::string &getGroup() const;
-  const std::string &getReadCommand() const;
-  const std::string &getWriteCommand() const;
-  const std::string &getField() const;
-  bool isRanged() const;
-  double getMinValue() const;
-  double getMaxValue() const;
-  const std::vector<std::string> &getEnumValues() const;
-
-  // Every command this control may cause to be sent. What the server allows is
-  // the union of these across a device's advertised controls, so the allowlist
-  // is derived rather than maintained separately.
-  std::vector<std::string> commands() const;
 };
 
 class DeviceControlDescriptorRegistry {
@@ -1217,6 +1183,10 @@ public:
   // deliberate: it lets a library re-word or translate a control natKit already
   // describes without forking it. Returns true if it displaced an existing
   // descriptor, so a caller that did not intend to override can notice.
+  //
+  // ⚠️ Contrast MetaRecord::registerMetaRecordType, which is FIRST-wins. The
+  // difference is justified rather than accidental: a decoder is correctness and
+  // must not be hijacked; a label is presentation and should be overridable.
   bool registerDescriptor(
       const std::shared_ptr<const DeviceControlDescriptor> &descriptor);
 
