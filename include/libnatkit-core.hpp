@@ -1046,6 +1046,120 @@ public:
   static DataSchemaDescriptorRegistry &getDefault();
 };
 
+// --- Device controls (TEC-NATKIT-10) ----------------------------------------
+//
+// What a DEVICE can be asked to do, as against what a stream contains. A board
+// advertises the control IDS it supports on its Configuration channel; the
+// human-facing half -- label, description, unit, range -- is resolved here.
+//
+// ⚠️ THE SPLIT IS THE POINT. The device is the only authority on what EXISTS,
+// because only the device knows what it was flashed with. The registry is the
+// only authority on what it is CALLED, because a label is presentation and does
+// not belong in a 1470-byte radio packet. Neither side can invent the other's
+// half, so they cannot drift into disagreeing about the same thing.
+//
+// ⚠️ AND IT IS AN EXTENSION POINT, not a table. A third-party library registers
+// descriptors for the controls its own hardware exposes, without modifying any
+// natKit source -- the same way DataSchemaDescriptorRegistry already works for
+// stream schemas.
+enum class DeviceControlKind {
+  // A one-shot action. No state to read; pressing it IS the whole interaction.
+  Button,
+  // A boolean, in a group read together and written one at a time.
+  Toggle,
+  // A typed value, using the FieldValueType vocabulary above rather than a
+  // parallel one.
+  Input,
+};
+
+std::string toString(const DeviceControlKind kind);
+Optional<DeviceControlKind> deviceControlKindFromString(const std::string &name);
+
+class DeviceControlDescriptor {
+  std::string controlId;
+  std::string label;
+  std::string description;
+  std::string unit;
+  DeviceControlKind kind;
+  FieldValueType valueType;
+  // Controls sharing a read command. Empty for a control that stands alone.
+  std::string group;
+  // The command that reads this control's state. Empty for a Button: there is
+  // nothing to read.
+  std::string readCommand;
+  // The command that acts. For a Button this is the action itself.
+  std::string writeCommand;
+  // The argument key on the wire -- "accel", "quarter_dbm". Empty for a Button.
+  std::string field;
+  bool ranged;
+  double minValue;
+  double maxValue;
+  std::vector<std::string> enumValues;
+
+public:
+  DeviceControlDescriptor();
+  DeviceControlDescriptor(
+      const std::string &controlId,
+      const std::string &label,
+      DeviceControlKind kind,
+      const std::string &writeCommand,
+      const std::string &readCommand = std::string{},
+      const std::string &field = std::string{},
+      FieldValueType valueType = FieldValueType::Bool,
+      const std::string &description = std::string{},
+      const std::string &unit = std::string{},
+      const std::string &group = std::string{},
+      bool ranged = false,
+      double minValue = 0.0,
+      double maxValue = 0.0,
+      const std::vector<std::string> &enumValues = std::vector<std::string>{});
+
+  const std::string &getControlId() const;
+  const std::string &getLabel() const;
+  const std::string &getDescription() const;
+  const std::string &getUnit() const;
+  DeviceControlKind getKind() const;
+  FieldValueType getValueType() const;
+  const std::string &getGroup() const;
+  const std::string &getReadCommand() const;
+  const std::string &getWriteCommand() const;
+  const std::string &getField() const;
+  bool isRanged() const;
+  double getMinValue() const;
+  double getMaxValue() const;
+  const std::vector<std::string> &getEnumValues() const;
+
+  // Every command this control may cause to be sent. What the server allows is
+  // the union of these across a device's advertised controls, so the allowlist
+  // is derived rather than maintained separately.
+  std::vector<std::string> commands() const;
+};
+
+class DeviceControlDescriptorRegistry {
+  std::unordered_map<std::string, std::shared_ptr<const DeviceControlDescriptor>>
+      descriptorsByControlId;
+
+public:
+  // ⚠️ LAST REGISTRATION WINS, matching DataSchemaDescriptorRegistry. That is
+  // deliberate: it lets a library re-word or translate a control natKit already
+  // describes without forking it. Returns true if it displaced an existing
+  // descriptor, so a caller that did not intend to override can notice.
+  bool registerDescriptor(
+      const std::shared_ptr<const DeviceControlDescriptor> &descriptor);
+
+  Optional<std::shared_ptr<const DeviceControlDescriptor>> findByControlId(
+      const std::string &controlId) const;
+
+  // Sorted, for diagnostics and tests -- "what does this build know about?"
+  std::vector<std::string> registeredControlIds() const;
+
+  static DeviceControlDescriptorRegistry &getDefault();
+};
+
+// natKit's own controls. Called by getDefault(); exposed so a test or a host
+// embedding the library can build a registry that does not share global state.
+void registerNatKitDeviceControls(DeviceControlDescriptorRegistry &registry);
+
 class ExgPillEmgDataSchemaV1Descriptor : public DataSchemaDescriptor {
 public:
   static const std::string name;
