@@ -54,7 +54,9 @@
       "commands_received": 0,
       "commands_delivered": 0,
       "commands_undelivered": 0,
-      "reset_reason": 1
+      "reset_reason": 1,
+      "nodes_present": 0,
+      "nodes_present_valid": false
     }
   },
   "_note": "The `node`/`primary` frames were captured from the live four-leaf rig on 2026-08-20 and are the PRE-TEC-NATKIT-52 sizes (168/144), which the decoder still accepts because the fleet is flashed one board at a time. The `*_extended` frames are those same bytes with the accumulators appended, built here in Python from the firmware's struct declaration -- they cannot be captured until a board is flashed, so this is the independent second reading of the layout in the meantime. The firmware also asserts every one of these offsets with offsetof(), so a field inserted there breaks the FIRMWARE build.",
@@ -82,7 +84,9 @@
       "spread_sum_sq": 55123456789,
       "markers_paired": 42984,
       "device_id": 203376942053180,
-      "coherence_bound_us": 169
+      "coherence_bound_us": 169,
+      "nodes_present": 0,
+      "nodes_present_valid": false
     }
   }
 }

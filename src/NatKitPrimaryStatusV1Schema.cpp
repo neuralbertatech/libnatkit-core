@@ -70,7 +70,12 @@ constexpr size_t kRegistrySealed = 82;
 constexpr size_t kNoiseFloorDbm = 83;
 constexpr size_t kChipTempC = 84;
 constexpr size_t kChipTempErr = 85;
-// 86..87 reserved[2] — spare bytes the firmware declares, not padding
+// --- added by TEC-NATKIT-81, into what `reserved[2]` used to hold ---
+constexpr size_t kNodesPresent = 86;
+constexpr size_t kNodesPresentValid = 87;
+// ⚠️ NO SPARE BYTES REMAIN before 88. The next field either declares 140..143 in
+// the firmware struct (tail padding today, so it must be declared before it can
+// be relied on to carry anything) or bumps V1.
 constexpr size_t kCommandsReceived = 88;
 constexpr size_t kCommandsRelayed = 92;
 constexpr size_t kCommandsMalformed = 96;
@@ -137,6 +142,10 @@ Optional<NatKitPrimaryStatusV1Schema> NatKitPrimaryStatusV1Schema::decodeBinary(
   s.noiseFloorDbm = rdi8(b, off::kNoiseFloorDbm);
   s.chipTempC = rdi8(b, off::kChipTempC);
   s.chipTempErr = rd8(b, off::kChipTempErr);
+  // These read 0/0 out of a pre-TEC-NATKIT-81 frame, which is exactly right: the
+  // flag says the count means nothing rather than the count claiming an empty rig.
+  s.nodesPresent = rd8(b, off::kNodesPresent);
+  s.nodesPresentValid = rd8(b, off::kNodesPresentValid);
   s.commandsReceived = rd32(b, off::kCommandsReceived);
   s.commandsRelayed = rd32(b, off::kCommandsRelayed);
   s.commandsMalformed = rd32(b, off::kCommandsMalformed);
@@ -187,6 +196,8 @@ std::vector<uint8_t> NatKitPrimaryStatusV1Schema::encodeBinary() const {
   b[off::kNoiseFloorDbm] = static_cast<uint8_t>(noiseFloorDbm);
   b[off::kChipTempC] = static_cast<uint8_t>(chipTempC);
   b[off::kChipTempErr] = chipTempErr;
+  b[off::kNodesPresent] = nodesPresent;
+  b[off::kNodesPresentValid] = nodesPresentValid;
   wr32(b, off::kCommandsReceived, commandsReceived);
   wr32(b, off::kCommandsRelayed, commandsRelayed);
   wr32(b, off::kCommandsMalformed, commandsMalformed);
@@ -233,6 +244,8 @@ std::string NatKitPrimaryStatusV1Schema::toJson() const {
     << ",\"noise_floor_dbm\":" << static_cast<int>(noiseFloorDbm)
     << ",\"chip_temp_c\":" << static_cast<int>(chipTempC)
     << ",\"chip_temp_err\":" << static_cast<int>(chipTempErr)
+    << ",\"nodes_present\":" << static_cast<int>(nodesPresent)
+    << ",\"nodes_present_valid\":" << static_cast<int>(nodesPresentValid)
     << ",\"commands_received\":" << commandsReceived
     << ",\"commands_relayed\":" << commandsRelayed
     << ",\"commands_malformed\":" << commandsMalformed

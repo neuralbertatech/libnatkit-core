@@ -1270,6 +1270,8 @@ public:
   uint32_t epoch = 0;
   uint32_t freeHeap = 0;
   uint32_t minFreeHeap = 0;
+  /** ⚠️ The ROSTER, not the fleet: nodes the hub remembers in NVS, which survives
+      both a reboot and a leaf's disappearance. See nodesPresent. */
   uint32_t nodesKnown = 0;
   uint32_t nodesRejected = 0;
   uint32_t unknownPackets = 0;
@@ -1288,6 +1290,13 @@ public:
   int8_t noiseFloorDbm = 0;
   int8_t chipTempC = 0;
   uint8_t chipTempErr = 0;
+  /** How many roster nodes the hub has actually HEARD lately (TEC-NATKIT-81).
+      ⚠️ Meaningless unless nodesPresentValid; a hub too old to report it sends a
+      zero that would otherwise read as "every leaf is gone". */
+  uint8_t nodesPresent = 0;
+  /** ⚠️ 0 = this hub does not report presence, so nodesPresent says nothing.
+      Zero present is a real and alarming state, so it cannot double as absent. */
+  uint8_t nodesPresentValid = 0;
   uint32_t commandsReceived = 0;
   uint32_t commandsRelayed = 0;
   uint32_t commandsMalformed = 0;

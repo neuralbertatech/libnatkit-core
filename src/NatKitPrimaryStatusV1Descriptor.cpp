@@ -34,8 +34,10 @@ SchemaFieldDescriptor buildRootField() {
                                 "Heap free now", "bytes"),
           SchemaFieldDescriptor("min_free_heap", "Heap low water", FieldValueType::Uint32,
                                 "Least heap ever free since boot; the figure that predicts an OOM", "bytes"),
-          SchemaFieldDescriptor("nodes_known", "Nodes known", FieldValueType::Uint32,
-                                "GAUGE, not a counter: leaves in the registry right now"),
+          SchemaFieldDescriptor("nodes_known", "Nodes on the roster", FieldValueType::Uint32,
+                                "GAUGE, not a counter: leaves the hub REMEMBERS, kept in NVS "
+                                "across reboots and never aged out. It does not fall when a "
+                                "board dies -- read nodes_present for that (TEC-NATKIT-81)"),
           SchemaFieldDescriptor("nodes_rejected", "Nodes rejected", FieldValueType::Uint32,
                                 "Cumulative: registrations refused (registry full, or sealed)"),
           SchemaFieldDescriptor("unknown_packets", "Unknown packets", FieldValueType::Uint32,
@@ -81,6 +83,14 @@ SchemaFieldDescriptor buildRootField() {
                                 "Only meaningful when chip_temp_err is 0", "C"),
           SchemaFieldDescriptor("chip_temp_err", "Temp read error", FieldValueType::Bool,
                                 "Non-zero means the temperature sensor read failed; ignore chip_temp_c"),
+          SchemaFieldDescriptor("nodes_present", "Nodes present", FieldValueType::Uint32,
+                                "GAUGE: roster nodes the hub has actually HEARD inside its "
+                                "presence window. Below nodes_known means a board is on the "
+                                "roster and off the air. Only meaningful when "
+                                "nodes_present_valid"),
+          SchemaFieldDescriptor("nodes_present_valid", "Presence reported", FieldValueType::Bool,
+                                "False on a hub too old to report presence. Not the same as "
+                                "zero present, which is a real state and a bad one"),
           SchemaFieldDescriptor("commands_received", "Commands received", FieldValueType::Uint32,
                                 "Cumulative: commands arriving from the server"),
           SchemaFieldDescriptor("commands_relayed", "Commands relayed", FieldValueType::Uint32,
@@ -186,6 +196,8 @@ Optional<FieldValueRef> NatKitPrimaryStatusV1Descriptor::tryGetFieldValue(
     if (f == "noise_floor_dbm") return FieldValueRef::fromInt16(s->noiseFloorDbm);
     if (f == "chip_temp_c") return FieldValueRef::fromInt16(s->chipTempC);
     if (f == "chip_temp_err") return FieldValueRef::fromBool(s->chipTempErr != 0);
+    if (f == "nodes_present") return FieldValueRef::fromUint32(s->nodesPresent);
+    if (f == "nodes_present_valid") return FieldValueRef::fromBool(s->nodesPresentValid != 0);
     if (f == "commands_received") return FieldValueRef::fromUint32(s->commandsReceived);
     if (f == "commands_relayed") return FieldValueRef::fromUint32(s->commandsRelayed);
     if (f == "commands_malformed") return FieldValueRef::fromUint32(s->commandsMalformed);
